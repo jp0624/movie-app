@@ -1,12 +1,20 @@
 import "../styles/MovieCard.css";
+import { useMovieContext } from "../contexts/MovieContext";
 interface Movie {
 	title: string;
 	poster_path: string;
 	release_date: string;
+	id: number;
 }
 
 function MovieCard({ movie }: { movie: Movie }) {
-	function onFavoriteClick() {
+	const { isFavorite, addToFavorites, removeFromFavorites } = useMovieContext();
+	function onFavoriteClick(movieId: number) {
+		if (isFavorite(movieId)) {
+			removeFromFavorites(movieId);
+		} else {
+			addToFavorites(movieId);
+		}
 		console.log(`Favorite clicked for movie: ${movie.title}`);
 	}
 
@@ -18,7 +26,10 @@ function MovieCard({ movie }: { movie: Movie }) {
 					alt={`${movie.title} Poster`}
 				/>
 				<div className="overlay">
-					<button className="favorite-btn" onClick={onFavoriteClick}>
+					<button
+						className={`favorite-btn ${isFavorite(movie.id) ? "active" : ""}`}
+						onClick={() => onFavoriteClick(movie.id)}
+					>
 						♥
 					</button>
 				</div>
@@ -26,7 +37,9 @@ function MovieCard({ movie }: { movie: Movie }) {
 
 			<div className="movie-info">
 				<h3 className="movie-title">{movie.title}</h3>
-				<p className="movie-release_date">{movie.release_date}</p>
+				<p className="movie-release_date">
+					{movie.release_date?.split("-")[0] || "N/A"}
+				</p>
 			</div>
 		</div>
 	);
