@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getMovie } from "../services/api";
-import MovieCard from "../components/MovieCard";
+// import { Movie } from "../types/Movie";
 
 export default function MovieDetails() {
 	const { id } = useParams();
-	const [movie, setMovie] = useState(null);
+	const [movie, setMovie] = useState<any | null>(null);
 
 	useEffect(() => {
 		const load = async () => {
@@ -32,6 +32,9 @@ export default function MovieDetails() {
 					<p className="text-gray-400">
 						⭐ TMDB Score: {movie.vote_average}/10
 					</p>
+					{movie.runtime && (
+						<p className="text-gray-400">🕒 Runtime: {movie.runtime} min</p>
+					)}
 				</div>
 			</div>
 		</div>

@@ -19,7 +19,7 @@ export const useMovie = () => {
 	return ctx;
 };
 
-export const MovieProvider = ({ children }) => {
+export const MovieProvider = ({ children }: { children: React.ReactNode }) => {
 	const [favorites, setFavorites] = useState<number[]>([]);
 	const [ratings, setRatings] = useState<Record<number, number>>({});
 	const [theme, setTheme] = useState<"light" | "dark">("dark");

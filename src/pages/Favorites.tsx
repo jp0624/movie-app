@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+// import { Movie } from "../types/Movie";
 import { useMovie } from "../contexts/MovieContext";
 import { getMovie } from "../services/api";
 import MovieCard from "../components/MovieCard";
 
 export default function Favorites() {
 	const { favorites, ratings } = useMovie();
-	const [movies, setMovies] = useState([]);
+	const [movies, setMovies] = useState<[]>([]);
 
 	useEffect(() => {
 		const load = async () => {

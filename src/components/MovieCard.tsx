@@ -1,7 +1,8 @@
 import { useMovie } from "../contexts/MovieContext";
+// import { Movie } from "../types/Movie";
 import { Link } from "react-router-dom";
 
-export default function MovieCard({ movie }) {
+export default function MovieCard({ movie }: { movie: any }) {
 	const { favorites, toggleFavorite, ratings, setRating } = useMovie();
 	const isFav = favorites.includes(movie.id);
 

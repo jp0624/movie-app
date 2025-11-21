@@ -1,4 +1,9 @@
-export default function Tabs({ active, setActive }) {
+interface TabsProps {
+	active: string;
+	setActive: (v: string) => void;
+}
+
+export default function Tabs({ active, setActive }: TabsProps) {
 	const tabs = ["Popular", "Top Rated", "Trending", "Now Playing"];
 
 	return (

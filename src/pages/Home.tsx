@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
+// import { Movie } from "../types/Movie";
+
 import {
 	getPopular,
 	getTopRated,
 	getTrending,
 	getNowPlaying,
 	searchMovies,
-} from "../services/api.ts";
+} from "../services/api";
 
 import MovieCard from "../components/MovieCard";
 import Tabs from "../components/Tabs";
@@ -17,12 +19,12 @@ export default function Home() {
 	const debounced = useDebounce(query, 350);
 
 	const [tab, setTab] = useState("Popular");
-	const [movies, setMovies] = useState([]);
+	const [movies, setMovies] = useState<[]>([]);
 	const [page, setPage] = useState(1);
 
 	const loadMovies = async (reset = false) => {
 		const pageToLoad = reset ? 1 : page;
-		let data;
+		let data: { results: [] };
 
 		if (debounced) {
 			data = await searchMovies(debounced, pageToLoad);
@@ -38,6 +40,7 @@ export default function Home() {
 
 	useEffect(() => {
 		setMovies([]);
+		setPage(1);
 		loadMovies(true);
 	}, [tab, debounced]);
 
