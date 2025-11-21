@@ -1,4 +1,14 @@
 @import "tailwindcss";
+
+:root {
+	color-scheme: light dark;
+}
+
+/* Smooth theme transitions */
 html {
 	transition: background-color 0.3s, color 0.3s;
+}
+
+body {
+	@apply bg-white text-black dark:bg-gray-900 dark:text-white;
 }

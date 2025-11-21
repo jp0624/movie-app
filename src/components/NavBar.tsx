@@ -1,39 +1,41 @@
+// src/components/NavBar.tsx
 import { Link } from "react-router-dom";
-import { useTheme } from "../contexts/ThemeContext";
+import { motion } from "framer-motion";
+import ThemeToggle from "./ThemeToggle";
 
 export default function NavBar() {
-	const { theme, toggleTheme } = useTheme();
-
 	return (
-		<nav className="bg-white dark:bg-black shadow px-6 py-4 flex justify-between items-center">
-			<Link
-				to="/"
-				className="text-2xl font-bold text-red-600 dark:text-red-500"
-			>
-				Movie App
-			</Link>
-
-			<div className="flex gap-6 items-center">
-				<Link
-					className="text-gray-700 dark:text-gray-300 hover:text-red-400"
-					to="/"
-				>
-					Home
-				</Link>
-				<Link
-					className="text-gray-700 dark:text-gray-300 hover:text-red-400"
-					to="/favorites"
-				>
-					Favorites
+		<motion.nav
+			initial={{ y: -40, opacity: 0 }}
+			animate={{ y: 0, opacity: 1 }}
+			transition={{ duration: 0.5, ease: "easeOut" }}
+			className="sticky top-0 z-30 bg-zinc-900/95 dark:bg-black/95 backdrop-blur border-b border-zinc-800"
+		>
+			<div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+				<Link to="/" className="flex items-baseline gap-2">
+					<span className="text-xl font-bold text-red-500 tracking-tight">
+						Movie
+					</span>
+					<span className="text-xl font-light text-zinc-200">Explorer</span>
 				</Link>
 
-				<button
-					onClick={toggleTheme}
-					className="px-3 py-1 text-sm bg-gray-300 dark:bg-gray-700 text-black dark:text-white rounded"
-				>
-					{theme === "dark" ? "Light" : "Dark"}
-				</button>
+				<div className="flex items-center gap-6">
+					<Link
+						to="/"
+						className="text-sm md:text-base text-zinc-300 hover:text-white transition-colors"
+					>
+						Home
+					</Link>
+					<Link
+						to="/favorites"
+						className="text-sm md:text-base text-zinc-300 hover:text-white transition-colors"
+					>
+						Favorites
+					</Link>
+
+					<ThemeToggle />
+				</div>
 			</div>
-		</nav>
+		</motion.nav>
 	);
 }
