@@ -1,11 +1,20 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
+import NavBar from "./components/NavBar.tsx";
+import Favorites from "./pages/Favorites.tsx";
+import Home from "./pages/Home.tsx";
+import { Route, Routes } from "react-router-dom";
 
 function App() {
-	const [count, setCount] = useState(0);
-
-	return <></>;
+	return (
+		<>
+			<NavBar />
+			<main className="main-content">
+				<Routes>
+					<Route path="/" element={<Home />} />
+					<Route path="/favorites" element={<Favorites />} />
+				</Routes>
+			</main>
+		</>
+	);
 }
 
 export default App;
