@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
+import "../styles/navbar.css";
 
-function NavBar() {
+function navbar() {
 	return (
-		<nav className="navBar">
-			<div className="navBar-brand">
+		<nav className="navbar">
+			<div className="navbar-brand">
 				<Link to="/">Movie App</Link>
 			</div>
-			<div className="navBar-links">
+			<div className="navbar-links">
 				<Link to="/">Home</Link>
 				<Link to="/favorites">Favorites</Link>
 			</div>
@@ -14,4 +15,4 @@ function NavBar() {
 	);
 }
 
-export default NavBar;
+export default navbar;

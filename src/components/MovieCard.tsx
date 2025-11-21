@@ -1,3 +1,4 @@
+import "../styles/MovieCard.css";
 interface Movie {
 	Title: string;
 	Poster: string;

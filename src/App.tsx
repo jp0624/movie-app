@@ -2,6 +2,7 @@ import NavBar from "./components/NavBar.tsx";
 import Favorites from "./pages/Favorites.tsx";
 import Home from "./pages/Home.tsx";
 import { Route, Routes } from "react-router-dom";
+import "./styles/App.css";
 
 function App() {
 	return (
