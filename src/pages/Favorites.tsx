@@ -1,18 +1,23 @@
 import { useEffect, useState } from "react";
-// import { Movie } from "../types/Movie";
+import type { Movie } from "../types/Movie";
 import { useMovie } from "../contexts/MovieContext";
 import { getMovie } from "../services/api";
 import MovieCard from "../components/MovieCard";
 
 export default function Favorites() {
 	const { favorites, ratings } = useMovie();
-	const [movies, setMovies] = useState<[]>([]);
+	const [movies, setMovies] = useState<Movie[]>([]);
 
 	useEffect(() => {
 		const load = async () => {
+			if (favorites.length === 0) {
+				setMovies([]);
+				return;
+			}
 			const data = await Promise.all(favorites.map((id) => getMovie(id)));
 			setMovies(data);
 		};
+
 		load();
 	}, [favorites]);
 
@@ -25,7 +30,9 @@ export default function Favorites() {
 	return (
 		<div className="p-6">
 			{sorted.length === 0 ? (
-				<p className="text-center text-gray-400 mt-12">No favorites yet.</p>
+				<p className="text-center text-gray-600 dark:text-gray-400">
+					No favorites yet.
+				</p>
 			) : (
 				<div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
 					{sorted.map((m) => (

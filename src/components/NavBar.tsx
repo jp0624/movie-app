@@ -1,30 +1,39 @@
 import { Link } from "react-router-dom";
-import { useMovie } from "../contexts/MovieContext";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function NavBar() {
-	const { theme, toggleTheme } = useMovie();
+	const { theme, toggleTheme } = useTheme();
 
 	return (
-		<header className="sticky top-0 z-50 bg-black/90 backdrop-blur p-4 flex justify-between items-center shadow">
-			<Link to="/" className="text-red-500 font-bold text-2xl">
-				🎬 MovieApp
+		<nav className="bg-white dark:bg-black shadow px-6 py-4 flex justify-between items-center">
+			<Link
+				to="/"
+				className="text-2xl font-bold text-red-600 dark:text-red-500"
+			>
+				Movie App
 			</Link>
 
-			<nav className="flex gap-6 text-white">
-				<Link to="/" className="hover:text-red-400">
+			<div className="flex gap-6 items-center">
+				<Link
+					className="text-gray-700 dark:text-gray-300 hover:text-red-400"
+					to="/"
+				>
 					Home
 				</Link>
-				<Link to="/favorites" className="hover:text-red-400">
+				<Link
+					className="text-gray-700 dark:text-gray-300 hover:text-red-400"
+					to="/favorites"
+				>
 					Favorites
 				</Link>
 
 				<button
 					onClick={toggleTheme}
-					className="bg-gray-800 px-3 py-1 rounded hover:bg-gray-700 ml-3"
+					className="px-3 py-1 text-sm bg-gray-300 dark:bg-gray-700 text-black dark:text-white rounded"
 				>
-					{theme === "dark" ? "☀️ Light" : "🌙 Dark"}
+					{theme === "dark" ? "Light" : "Dark"}
 				</button>
-			</nav>
-		</header>
+			</div>
+		</nav>
 	);
 }

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-// import { Movie } from "../types/Movie";
+import { useEffect, useState, useCallback } from "react";
+import type { Movie } from "../types/Movie";
 
 import {
 	getPopular,
@@ -11,46 +11,86 @@ import {
 
 import MovieCard from "../components/MovieCard";
 import Tabs from "../components/Tabs";
+
 import useDebounce from "../hooks/useDebounce";
 import useInfiniteScroll from "../hooks/useInfiniteScroll";
 
 export default function Home() {
+	// --- SEARCH ---
 	const [query, setQuery] = useState("");
 	const debounced = useDebounce(query, 350);
 
+	// --- TABS ---
 	const [tab, setTab] = useState("Popular");
-	const [movies, setMovies] = useState<[]>([]);
+
+	// --- MOVIE DATA ---
+	const [movies, setMovies] = useState<Movie[]>([]);
 	const [page, setPage] = useState(1);
+	const [loading, setLoading] = useState(false);
 
-	const loadMovies = async (reset = false) => {
-		const pageToLoad = reset ? 1 : page;
-		let data: { results: [] };
+	// ---------------------------------------------
+	// Fetch movies
+	// ---------------------------------------------
+	const loadMovies = useCallback(
+		async (pageToLoad: number, reset: boolean) => {
+			try {
+				setLoading(true);
 
-		if (debounced) {
-			data = await searchMovies(debounced, pageToLoad);
-		} else {
-			if (tab === "Popular") data = await getPopular(pageToLoad);
-			if (tab === "Top Rated") data = await getTopRated(pageToLoad);
-			if (tab === "Trending") data = await getTrending(pageToLoad);
-			if (tab === "Now Playing") data = await getNowPlaying(pageToLoad);
-		}
+				let data: { results: Movie[] };
 
-		setMovies((prev) => (reset ? data.results : [...prev, ...data.results]));
-	};
+				// If searching
+				if (debounced.trim().length > 0) {
+					data = await searchMovies(debounced, pageToLoad);
+				} else {
+					if (tab === "Popular") data = await getPopular(pageToLoad);
+					else if (tab === "Top Rated") data = await getTopRated(pageToLoad);
+					else if (tab === "Trending") data = await getTrending(pageToLoad);
+					else data = await getNowPlaying(pageToLoad);
+				}
 
+				setMovies((prev) =>
+					reset ? data.results : [...prev, ...data.results]
+				);
+			} finally {
+				setLoading(false);
+			}
+		},
+		[tab, debounced]
+	);
+
+	// ---------------------------------------------
+	// When tab or search changes → reset + load page 1
+	// ---------------------------------------------
 	useEffect(() => {
 		setMovies([]);
 		setPage(1);
-		loadMovies(true);
 	}, [tab, debounced]);
 
-	useInfiniteScroll(() => {
-		setPage((p) => p + 1);
-		loadMovies(false);
-	});
+	// ---------------------------------------------
+	// Load whenever "page" changes
+	// ---------------------------------------------
+	useEffect(() => {
+		loadMovies(page, page === 1);
+	}, [page, loadMovies]);
 
+	// ---------------------------------------------
+	// Infinite scroll
+	// Only triggers when NOT loading
+	// ---------------------------------------------
+	useInfiniteScroll(
+		useCallback(() => {
+			if (!loading) {
+				setPage((p) => p + 1);
+			}
+		}, [loading])
+	);
+
+	// ---------------------------------------------
+	// Render
+	// ---------------------------------------------
 	return (
 		<div className="p-6">
+			{/* Search */}
 			<form
 				onSubmit={(e) => e.preventDefault()}
 				className="max-w-xl mx-auto mb-8"
@@ -63,15 +103,23 @@ export default function Home() {
 				/>
 			</form>
 
+			{/* Tabs */}
 			<Tabs active={tab} setActive={setTab} />
 
-			<div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+			{/* Grid */}
+			<div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
 				{movies.map((m) => (
 					<MovieCard key={m.id} movie={m} />
 				))}
 			</div>
 
-			<div id="infinite-trigger" className="h-12"></div>
+			{/* Infinite Scroll Trigger */}
+			<div id="infinite-trigger" className="h-16"></div>
+
+			{/* Loading indicator */}
+			{loading && (
+				<p className="text-center text-gray-400 mt-4">Loading more…</p>
+			)}
 		</div>
 	);
 }

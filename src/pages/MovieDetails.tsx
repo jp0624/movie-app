@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getMovie } from "../services/api";
-// import { Movie } from "../types/Movie";
+import type { Movie } from "../types/Movie";
 
 export default function MovieDetails() {
 	const { id } = useParams();
-	const [movie, setMovie] = useState<any | null>(null);
+	const [movie, setMovie] = useState<Movie | null>(null);
 
 	useEffect(() => {
 		const load = async () => {

@@ -1,70 +1,64 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+	createContext,
+	useContext,
+	useState,
+	useEffect,
+	ReactNode,
+} from "react";
 
-interface MovieCtx {
+interface MovieContextType {
 	favorites: number[];
-	toggleFavorite(id: number): void;
+	toggleFavorite: (id: number) => void;
 
 	ratings: Record<number, number>;
-	setRating(id: number, v: number): void;
-
-	theme: "light" | "dark";
-	toggleTheme(): void;
+	setRating: (id: number, rating: number) => void;
 }
 
-const MovieContext = createContext<MovieCtx | null>(null);
+const MovieContext = createContext<MovieContextType | null>(null);
 
-export const useMovie = () => {
-	const ctx = useContext(MovieContext);
-	if (!ctx) throw new Error("MovieContext missing");
-	return ctx;
-};
+export function MovieProvider({ children }: { children: ReactNode }) {
+	const [favorites, setFavorites] = useState<number[]>(() => {
+		const stored = localStorage.getItem("favorites");
+		return stored ? JSON.parse(stored) : [];
+	});
 
-export const MovieProvider = ({ children }: { children: React.ReactNode }) => {
-	const [favorites, setFavorites] = useState<number[]>([]);
-	const [ratings, setRatings] = useState<Record<number, number>>({});
-	const [theme, setTheme] = useState<"light" | "dark">("dark");
+	const [ratings, setRatings] = useState<Record<number, number>>(() => {
+		const stored = localStorage.getItem("ratings");
+		return stored ? JSON.parse(stored) : {};
+	});
 
 	useEffect(() => {
-		const f = localStorage.getItem("favorites");
-		if (f) setFavorites(JSON.parse(f));
+		localStorage.setItem("favorites", JSON.stringify(favorites));
+	}, [favorites]);
 
-		const r = localStorage.getItem("ratings");
-		if (r) setRatings(JSON.parse(r));
-
-		const t = localStorage.getItem("theme");
-		if (t === "light") setTheme("light");
-	}, []);
-
-	useEffect(
-		() => localStorage.setItem("favorites", JSON.stringify(favorites)),
-		[favorites]
-	);
-	useEffect(
-		() => localStorage.setItem("ratings", JSON.stringify(ratings)),
-		[ratings]
-	);
 	useEffect(() => {
-		localStorage.setItem("theme", theme);
-		document.documentElement.classList.toggle("dark", theme === "dark");
-	}, [theme]);
+		localStorage.setItem("ratings", JSON.stringify(ratings));
+	}, [ratings]);
+
+	const toggleFavorite = (id: number) => {
+		setFavorites((prev) =>
+			prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+		);
+	};
+
+	const setRating = (id: number, rating: number) => {
+		setRatings((prev) => ({
+			...prev,
+			[id]: rating,
+		}));
+	};
 
 	return (
 		<MovieContext.Provider
-			value={{
-				favorites,
-				toggleFavorite: (id) =>
-					setFavorites((prev) =>
-						prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-					),
-
-				ratings,
-				setRating: (id, v) => setRatings((prev) => ({ ...prev, [id]: v })),
-
-				theme,
-				toggleTheme: () => setTheme((t) => (t === "dark" ? "light" : "dark")),
-			}}
+			value={{ favorites, toggleFavorite, ratings, setRating }}
 		>
 			{children}
 		</MovieContext.Provider>
 	);
-};
+}
+
+export function useMovie() {
+	const ctx = useContext(MovieContext);
+	if (!ctx) throw new Error("useMovie must be inside <MovieProvider>");
+	return ctx;
+}

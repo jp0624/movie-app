@@ -5,11 +5,17 @@ export default function useInfiniteScroll(callback: () => void) {
 		const target = document.getElementById("infinite-trigger");
 		if (!target) return;
 
-		const observer = new IntersectionObserver((entries) => {
-			if (entries[0].isIntersecting) callback();
-		});
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting) {
+					callback();
+				}
+			},
+			{ threshold: 1 }
+		);
 
 		observer.observe(target);
+
 		return () => observer.disconnect();
-	}, []);
+	}, [callback]);
 }

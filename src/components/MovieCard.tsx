@@ -1,13 +1,14 @@
 import { useMovie } from "../contexts/MovieContext";
-// import { Movie } from "../types/Movie";
+import type { Movie } from "../types/Movie";
 import { Link } from "react-router-dom";
 
-export default function MovieCard({ movie }: { movie: any }) {
+export default function MovieCard({ movie }: { movie: Movie }) {
 	const { favorites, toggleFavorite, ratings, setRating } = useMovie();
+
 	const isFav = favorites.includes(movie.id);
 
 	return (
-		<div className="bg-gray-900 rounded-xl overflow-hidden hover:scale-[1.02] shadow transition">
+		<div className="bg-gray-100 dark:bg-gray-900 rounded-xl overflow-hidden shadow hover:scale-[1.02] transition">
 			<Link to={`/movie/${movie.id}`}>
 				<img
 					src={
@@ -20,8 +21,10 @@ export default function MovieCard({ movie }: { movie: any }) {
 			</Link>
 
 			<div className="p-4 text-white">
-				<h3 className="font-semibold">{movie.title ?? movie.name}</h3>
-				<p className="text-gray-400 text-sm">
+				<h3 className="font-semibold text-black dark:text-white">
+					{movie.title} ?? {movie.name}
+				</h3>
+				<p className="text-sm text-gray-600 dark:text-gray-400">
 					{movie.release_date?.split("-")[0] ?? ""}
 				</p>
 
@@ -39,7 +42,7 @@ export default function MovieCard({ movie }: { movie: any }) {
 						className="bg-gray-800 p-1 rounded"
 					>
 						<option value="">Rate</option>
-						{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+						{Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
 							<option key={n} value={n}>
 								{n}
 							</option>
