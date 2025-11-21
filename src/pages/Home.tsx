@@ -1,91 +1,74 @@
+import { useEffect, useState } from "react";
+import {
+	getPopular,
+	getTopRated,
+	getTrending,
+	getNowPlaying,
+	searchMovies,
+} from "../services/api.ts";
+
 import MovieCard from "../components/MovieCard";
-import { useState, useEffect } from "react";
-import { getPopularMovies, searchMovies } from "../services/api";
-import "../styles/Home.css";
+import Tabs from "../components/Tabs";
+import useDebounce from "../hooks/useDebounce";
+import useInfiniteScroll from "../hooks/useInfiniteScroll";
 
-function Home() {
-	const [searchQuery, setSearchQuery] = useState("");
+export default function Home() {
+	const [query, setQuery] = useState("");
+	const debounced = useDebounce(query, 350);
+
+	const [tab, setTab] = useState("Popular");
 	const [movies, setMovies] = useState([]);
-	const [error, setError] = useState("");
-	const [loading, setLoading] = useState(true);
+	const [page, setPage] = useState(1);
 
-	useEffect(() => {
-		const fetchPopularMovies = async () => {
-			try {
-				const popularMovies = await getPopularMovies();
-				setMovies(popularMovies);
-			} catch (error) {
-				setError(`Failed to load movies.`);
-				console.error("Error fetching popular movies:", error);
-			} finally {
-				console.log("Finished fetching popular movies");
-				setLoading(false);
-			}
-		};
-		fetchPopularMovies();
-	}, []);
+	const loadMovies = async (reset = false) => {
+		const pageToLoad = reset ? 1 : page;
+		let data;
 
-	useEffect(() => {
-		console.log("Movies updated: ", movies);
-	}, [movies]);
-
-	const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
-		e.preventDefault();
-		if (!searchQuery.trim || loading) {
-			return;
+		if (debounced) {
+			data = await searchMovies(debounced, pageToLoad);
+		} else {
+			if (tab === "Popular") data = await getPopular(pageToLoad);
+			if (tab === "Top Rated") data = await getTopRated(pageToLoad);
+			if (tab === "Trending") data = await getTrending(pageToLoad);
+			if (tab === "Now Playing") data = await getNowPlaying(pageToLoad);
 		}
-		setLoading(true);
-		const fetchSearchedMovies = async () => {
-			try {
-				const searchResults = await searchMovies(searchQuery);
-				setMovies(searchResults);
-				setError("");
-			} catch (error) {
-				setError(`Failed to load movies.`);
-				console.error("Error fetching searched movies:", error);
-			} finally {
-				console.log("Finished fetching searched movies");
-				setLoading(false);
-			}
-		};
-		fetchSearchedMovies();
 
-		console.log("search submitted");
+		setMovies((prev) => (reset ? data.results : [...prev, ...data.results]));
 	};
+
+	useEffect(() => {
+		setMovies([]);
+		loadMovies(true);
+	}, [tab, debounced]);
+
+	useInfiniteScroll(() => {
+		setPage((p) => p + 1);
+		loadMovies(false);
+	});
+
 	return (
-		<>
-			<div className="home">
-				<form onSubmit={handleSearch} className="search-form">
-					<input
-						type="text"
-						placeholder="Search movies..."
-						className="search-input"
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-					/>
-					<button type="submit" className="search-button">
-						Search
-					</button>
-				</form>
-				{error && <div className="error-message">{error}</div>}
-				{loading ? (
-					<div className="loading">Loading...</div>
-				) : (
-					<div className="movies-grid">
-						{movies &&
-							movies.map(
-								(movie) =>
-									movie.title
-										.toLowerCase()
-										.includes(searchQuery.toLowerCase()) && (
-										<MovieCard key={movie.id} movie={movie} />
-									)
-							)}
-					</div>
-				)}
+		<div className="p-6">
+			<form
+				onSubmit={(e) => e.preventDefault()}
+				className="max-w-xl mx-auto mb-8"
+			>
+				<input
+					className="w-full bg-gray-800 text-white p-3 rounded"
+					placeholder="Search movies..."
+					value={query}
+					onChange={(e) => setQuery(e.target.value)}
+				/>
+			</form>
+
+			<Tabs active={tab} setActive={setTab} />
+
+			<div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+				{movies.map((m) => (
+					<MovieCard key={m.id} movie={m} />
+				))}
 			</div>
-		</>
+
+			<div id="infinite-trigger" className="h-12"></div>
+		</div>
 	);
 }
-
-export default Home;

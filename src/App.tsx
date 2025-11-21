@@ -1,22 +1,22 @@
-import NavBar from "./components/NavBar.tsx";
-import Favorites from "./pages/Favorites.tsx";
-import Home from "./pages/Home.tsx";
-import { Route, Routes } from "react-router-dom";
-import { MovieProvider } from "./contexts/MovieContext.tsx";
-import "./styles/App.css";
+import { Routes, Route } from "react-router-dom";
+import NavBar from "./components/NavBar";
+import Home from "./pages/Home";
+import Favorites from "./pages/Favorites";
+import MovieDetails from "./pages/MovieDetails";
+import { MovieProvider } from "./contexts/MovieContext";
 
-function App() {
+export default function App() {
 	return (
 		<MovieProvider>
 			<NavBar />
-			<main className="main-content">
+
+			<main className="max-w-7xl mx-auto w-full">
 				<Routes>
 					<Route path="/" element={<Home />} />
 					<Route path="/favorites" element={<Favorites />} />
+					<Route path="/movie/:id" element={<MovieDetails />} />
 				</Routes>
 			</main>
 		</MovieProvider>
 	);
 }
-
-export default App;

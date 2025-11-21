@@ -1,18 +1,30 @@
 import { Link } from "react-router-dom";
-import "../styles/navbar.css";
+import { useMovie } from "../contexts/MovieContext";
 
-function navbar() {
+export default function NavBar() {
+	const { theme, toggleTheme } = useMovie();
+
 	return (
-		<nav className="navbar">
-			<div className="navbar-brand">
-				<Link to="/">Movie App</Link>
-			</div>
-			<div className="navbar-links">
-				<Link to="/">Home</Link>
-				<Link to="/favorites">Favorites</Link>
-			</div>
-		</nav>
+		<header className="sticky top-0 z-50 bg-black/90 backdrop-blur p-4 flex justify-between items-center shadow">
+			<Link to="/" className="text-red-500 font-bold text-2xl">
+				🎬 MovieApp
+			</Link>
+
+			<nav className="flex gap-6 text-white">
+				<Link to="/" className="hover:text-red-400">
+					Home
+				</Link>
+				<Link to="/favorites" className="hover:text-red-400">
+					Favorites
+				</Link>
+
+				<button
+					onClick={toggleTheme}
+					className="bg-gray-800 px-3 py-1 rounded hover:bg-gray-700 ml-3"
+				>
+					{theme === "dark" ? "☀️ Light" : "🌙 Dark"}
+				</button>
+			</nav>
+		</header>
 	);
 }
-
-export default navbar;
