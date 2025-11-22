@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { useMovie } from "../contexts/MovieContext";
 import { getMovie } from "../services/api";
 import type { Movie } from "../types/Movie";
-import MovieGrid from "../components/MovieGrid";
-import MovieSkeleton from "../components/MovieSkeleton";
+import MovieGrid from "../components/media/MovieGrid";
+import MovieSkeleton from "../components/media/MovieSkeleton";
 
 export default function Favorites() {
 	const { favorites, ratings } = useMovie();

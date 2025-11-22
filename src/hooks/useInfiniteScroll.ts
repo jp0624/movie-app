@@ -1,3 +1,4 @@
+// src/hooks/useInfiniteScroll.ts
 import { useEffect } from "react";
 
 export default function useInfiniteScroll(callback: () => void) {
@@ -5,13 +6,25 @@ export default function useInfiniteScroll(callback: () => void) {
 		const target = document.getElementById("infinite-trigger");
 		if (!target) return;
 
+		let ticking = false;
+
 		const observer = new IntersectionObserver(
 			(entries) => {
-				if (entries[0].isIntersecting) {
+				const [entry] = entries;
+				if (entry.isIntersecting && !ticking) {
+					ticking = true;
 					callback();
+					// small delay to avoid rapid-fire triggers while layout settles
+					setTimeout(() => {
+						ticking = false;
+					}, 400);
 				}
 			},
-			{ threshold: 1 }
+			{
+				root: null,
+				rootMargin: "200px 0px 0px 0px",
+				threshold: 0.1,
+			}
 		);
 
 		observer.observe(target);
