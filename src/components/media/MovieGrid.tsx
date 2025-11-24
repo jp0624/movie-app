@@ -1,26 +1,40 @@
 // src/components/media/MovieGrid.tsx
 import { motion } from "framer-motion";
 import type { Movie } from "../../types/Movie";
+import type { TvShow } from "../../types/Tv";
 import MovieCard from "./MovieCard";
 
-const list = {
-	hidden: {},
-	show: {
-		transition: { staggerChildren: 0.08 },
-	},
-};
+type Mode = "movie" | "tv";
 
-export default function MovieGrid({ movies, mediaType = "movie" }) {
+interface Props {
+	movies: (Movie | TvShow)[];
+	mediaType?: Mode;
+	className?: string;
+}
+
+export default function MovieGrid({
+	movies,
+	mediaType = "movie",
+	className = "",
+}: Props) {
 	return (
-		<motion.div
-			variants={list}
-			initial="hidden"
-			animate="show"
-			className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mt-6"
+		<div
+			className={`grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 ${className}`}
 		>
-			{movies.map((m) => (
-				<MovieCard key={m.id} movie={m} mediaType={mediaType} />
+			{movies.map((m, index) => (
+				<motion.div
+					key={m.id}
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					transition={{
+						duration: 0.35,
+						delay: index * 0.05,
+						ease: "easeOut",
+					}}
+				>
+					<MovieCard movie={m} mediaType={mediaType} />
+				</motion.div>
 			))}
-		</motion.div>
+		</div>
 	);
 }

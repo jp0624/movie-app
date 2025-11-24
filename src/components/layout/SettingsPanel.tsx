@@ -1,137 +1,145 @@
 // src/components/layout/SettingsPanel.tsx
-import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTheme } from "../../contexts/ThemeContext";
 import { useSettings } from "../../contexts/SettingsContext";
-import Surface from "../ui/Surface";
-import Button from "../ui/Button";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function SettingsPanel() {
-	const [open, setOpen] = useState(false);
-	const { theme, setTheme } = useTheme();
 	const {
-		animationsEnabled,
-		cardDensity,
-		setAnimationsEnabled,
-		setCardDensity,
+		isOpen,
+		closeSettings,
+		preferredMediaMode,
+		setPreferredMediaMode,
+		reduceMotion,
+		setReduceMotion,
 	} = useSettings();
 
-	return (
-		<div className="fixed bottom-4 right-4 z-40">
-			{/* Toggle FAB */}
-			<motion.button
-				type="button"
-				onClick={() => setOpen((o) => !o)}
-				whileTap={{ scale: 0.95 }}
-				className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-background shadow-lg shadow-black/40"
-				aria-label="Open settings"
-			>
-				{/* simple gear icon */}
-				<span className="text-xl">⚙️</span>
-			</motion.button>
+	const { theme, setTheme } = useTheme();
 
-			<AnimatePresence>
-				{open && (
+	return (
+		<AnimatePresence>
+			{isOpen && (
+				<motion.div
+					className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					exit={{ opacity: 0 }}
+				>
 					<motion.div
-						initial={{ opacity: 0, y: 12 }}
-						animate={{ opacity: 1, y: 0 }}
-						exit={{ opacity: 0, y: 12 }}
-						transition={{ duration: 0.2, ease: "easeOut" }}
-						className="mt-3 w-72 max-w-[90vw]"
+						initial={{ opacity: 0, y: 20, scale: 0.96 }}
+						animate={{ opacity: 1, y: 0, scale: 1 }}
+						exit={{ opacity: 0, y: 12, scale: 0.96 }}
+						transition={{ duration: 0.25, ease: "easeOut" }}
+						className="w-full max-w-md rounded-2xl border border-token bg-surface p-5 shadow-card"
 					>
-						<Surface className="border-token bg-surface-alt p-4">
-							<div className="mb-3 flex items-center justify-between">
-								<h2 className="text-sm font-semibold text-foreground">
-									Experience settings
+						<div className="mb-4 flex items-center justify-between">
+							<div>
+								<h2 className="text-base font-semibold text-foreground">
+									Settings
 								</h2>
+								<p className="text-xs text-muted">
+									Personalize your CineScope experience.
+								</p>
+							</div>
+							<button
+								type="button"
+								onClick={closeSettings}
+								className="rounded-full px-2 py-1 text-sm text-muted hover:bg-surface-alt"
+							>
+								✕
+							</button>
+						</div>
+
+						<div className="space-y-5 text-sm text-muted">
+							{/* Theme */}
+							<div>
+								<p className="mb-2 text-xs font-semibold uppercase tracking-wide text-soft">
+									Theme
+								</p>
+								<div className="inline-flex rounded-full border border-token bg-surface-alt p-1 text-xs">
+									<button
+										type="button"
+										onClick={() => setTheme("light")}
+										className={`rounded-full px-3 py-1 ${
+											theme === "light"
+												? "bg-accent text-white"
+												: "text-muted hover:text-foreground"
+										}`}
+									>
+										Light
+									</button>
+									<button
+										type="button"
+										onClick={() => setTheme("dark")}
+										className={`rounded-full px-3 py-1 ${
+											theme === "dark"
+												? "bg-accent text-white"
+												: "text-muted hover:text-foreground"
+										}`}
+									>
+										Dark
+									</button>
+								</div>
+							</div>
+
+							{/* Default media mode */}
+							<div>
+								<p className="mb-2 text-xs font-semibold uppercase tracking-wide text-soft">
+									Default Discover Mode
+								</p>
+								<div className="inline-flex rounded-full border border-token bg-surface-alt p-1 text-xs">
+									<button
+										type="button"
+										onClick={() => setPreferredMediaMode("movie")}
+										className={`rounded-full px-3 py-1 ${
+											preferredMediaMode === "movie"
+												? "bg-accent text-white"
+												: "text-muted hover:text-foreground"
+										}`}
+									>
+										Movies
+									</button>
+									<button
+										type="button"
+										onClick={() => setPreferredMediaMode("tv")}
+										className={`rounded-full px-3 py-1 ${
+											preferredMediaMode === "tv"
+												? "bg-accent text-white"
+												: "text-muted hover:text-foreground"
+										}`}
+									>
+										TV Shows
+									</button>
+								</div>
+							</div>
+
+							{/* Motion */}
+							<div className="flex items-center justify-between">
+								<div>
+									<p className="text-xs font-semibold uppercase tracking-wide text-soft">
+										Reduce Motion
+									</p>
+									<p className="text-xs text-muted">
+										Simplify animations for smoother performance.
+									</p>
+								</div>
 								<button
 									type="button"
-									onClick={() => setOpen(false)}
-									className="text-xs text-muted hover:text-foreground"
+									onClick={() => setReduceMotion(!reduceMotion)}
+									className={`relative h-6 w-11 rounded-full border border-token transition-colors ${
+										reduceMotion ? "bg-accent" : "bg-surface-alt"
+									}`}
 								>
-									Close
+									<span
+										className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow-card transition-transform ${
+											reduceMotion ? "translate-x-[18px]" : "translate-x-[2px]"
+										}`}
+									/>
 								</button>
 							</div>
-
-							<div className="space-y-4 text-sm text-muted">
-								{/* Theme */}
-								<div>
-									<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
-										Theme
-									</p>
-									<div className="inline-flex rounded-full bg-surface border border-token p-1">
-										<button
-											type="button"
-											onClick={() => setTheme("dark")}
-											className={`px-3 py-1 text-xs rounded-full transition-colors ${
-												theme === "dark"
-													? "bg-accent text-background"
-													: "text-muted hover:text-foreground"
-											}`}
-										>
-											Dark
-										</button>
-										<button
-											type="button"
-											onClick={() => setTheme("light")}
-											className={`px-3 py-1 text-xs rounded-full transition-colors ${
-												theme === "light"
-													? "bg-accent text-background"
-													: "text-muted hover:text-foreground"
-											}`}
-										>
-											Light
-										</button>
-									</div>
-								</div>
-
-								{/* Animations */}
-								<div>
-									<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
-										Animations
-									</p>
-									<div className="flex items-center justify-between">
-										<span>
-											<span className="font-medium text-foreground">
-												Marvel mode
-											</span>
-											<span className="ml-1 text-xs text-muted">
-												(subtle motion on cards)
-											</span>
-										</span>
-										<Button
-											size="xs"
-											variant={animationsEnabled ? "primary" : "outline"}
-											onClick={() => setAnimationsEnabled(!animationsEnabled)}
-										>
-											{animationsEnabled ? "On" : "Off"}
-										</Button>
-									</div>
-								</div>
-
-								{/* Card density */}
-								<div>
-									<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
-										Card density
-									</p>
-									<div className="flex gap-2">
-										{(["comfortable", "cozy", "compact"] as const).map((d) => (
-											<Button
-												key={d}
-												size="xs"
-												variant={cardDensity === d ? "primary" : "outline"}
-												onClick={() => setCardDensity(d)}
-											>
-												{d}
-											</Button>
-										))}
-									</div>
-								</div>
-							</div>
-						</Surface>
+						</div>
 					</motion.div>
-				)}
-			</AnimatePresence>
-		</div>
+				</motion.div>
+			)}
+		</AnimatePresence>
 	);
 }

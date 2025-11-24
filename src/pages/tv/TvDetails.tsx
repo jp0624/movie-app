@@ -1,14 +1,15 @@
 // src/pages/tv/TvDetails.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 
-import type { TvShow, Season } from "../../types/Tv";
+import type { TvShow } from "../../types/Tv";
 import type {
 	CreditsResponse,
 	VideosResponse,
 	ReviewsResponse,
 	WatchProvidersResponse,
+	ImagesResponse,
 } from "../../types/Shared";
 
 import {
@@ -18,24 +19,28 @@ import {
 	getTvReviews,
 	getTvRecommendations,
 	getTvWatchProviders,
+	getTvImages,
 } from "../../services/api";
 
 import Surface from "../../components/ui/Surface";
 import SectionHeader from "../../components/ui/SectionHeader";
-import Badge from "../../components/ui/Badge";
 import CastCarousel from "../../components/media/CastCarousel";
 import TrailerCarousel from "../../components/media/TrailerCarousel";
 import RecommendationsRow from "../../components/media/RecommendationsRow";
+import ReviewsList from "../../components/media/ReviewsList";
 import SeasonCarousel from "../../components/media/SeasonCarousel";
+import ImageGallery from "../../components/media/ImageGallery";
 
-interface RouteParams {
-	id?: string;
-}
+import ParallaxHero, {
+	type HeroSlide,
+} from "../../components/layout/ParallaxHero";
 
 export default function TvDetails() {
-	const { id } = useParams<RouteParams>();
+	/* -----------------------------------------------------
+	   HOOKS — STABLE ORDER
+	----------------------------------------------------- */
+	const { id } = useParams();
 	const tvId = Number(id);
-	const navigate = useNavigate();
 
 	const [show, setShow] = useState<TvShow | null>(null);
 	const [credits, setCredits] = useState<CreditsResponse | null>(null);
@@ -45,19 +50,22 @@ export default function TvDetails() {
 		null
 	);
 	const [recommendations, setRecommendations] = useState<TvShow[]>([]);
+	const [images, setImages] = useState<ImagesResponse | null>(null);
+
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	// Non-hook derived values must come after hooks setup,
-	// but before early returns. We'll calculate using show? everywhere.
-
+	/* -----------------------------------------------------
+	   LOAD TV DETAILS
+	----------------------------------------------------- */
 	useEffect(() => {
-		if (!tvId || Number.isNaN(tvId)) return;
+		if (!tvId) return;
 		let cancelled = false;
 
 		const load = async () => {
 			setLoading(true);
 			setError(null);
+
 			try {
 				const [
 					showRes,
@@ -66,6 +74,7 @@ export default function TvDetails() {
 					reviewsRes,
 					recsRes,
 					providersRes,
+					imagesRes,
 				] = await Promise.all([
 					getTv(tvId),
 					getTvCredits(tvId),
@@ -73,6 +82,7 @@ export default function TvDetails() {
 					getTvReviews(tvId),
 					getTvRecommendations(tvId),
 					getTvWatchProviders(tvId),
+					getTvImages(tvId),
 				]);
 
 				if (cancelled) return;
@@ -81,12 +91,13 @@ export default function TvDetails() {
 				setCredits(creditsRes);
 				setVideos(videosRes);
 				setReviews(reviewsRes);
-				setRecommendations(recsRes.results ?? []);
 				setProviders(providersRes);
+				setRecommendations(recsRes.results ?? []);
+				setImages(imagesRes);
 			} catch (err) {
 				if (!cancelled) {
 					setError(
-						err instanceof Error ? err.message : "Failed to load TV details"
+						err instanceof Error ? err.message : "Failed to load TV details."
 					);
 				}
 			} finally {
@@ -100,310 +111,226 @@ export default function TvDetails() {
 		};
 	}, [tvId]);
 
+	/* -----------------------------------------------------
+	   MEMO-DERIVED DATA
+	----------------------------------------------------- */
 	const cast = credits?.cast ?? [];
 	const topCast = cast.slice(0, 12);
+
 	const videosList = videos?.results ?? [];
 	const trailerVideos = videosList.filter(
 		(v) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser")
 	);
-	const mainReviews = reviews?.results?.slice(0, 4) ?? [];
 
 	const countryProviders =
 		providers?.results?.["CA"] ?? providers?.results?.["US"];
 
-	const seasons: Season[] = show?.seasons ?? [];
-	const sortedSeasons = useMemo(
-		() => [...seasons].sort((a, b) => a.season_number - b.season_number),
-		[seasons]
-	);
-
 	const year = show?.first_air_date?.split("-")[0] ?? "";
-	const score = show?.vote_average != null ? show.vote_average.toFixed(1) : "–";
 
-	const heroBackdrop = useMemo(() => {
-		if (!show) return "/no-image.png";
-		if (show.backdrop_path) {
-			return `https://image.tmdb.org/t/p/original${show.backdrop_path}`;
+	const backdropImages = images?.backdrops ?? [];
+	const posterImages = images?.posters ?? [];
+	const logoImages = images?.logos ?? [];
+
+	const heroSlides: HeroSlide[] = useMemo(() => {
+		if (!show) return [];
+
+		// Prefer top 5 backdrops if we have them
+		if (backdropImages.length > 0) {
+			return backdropImages.slice(0, 5).map((b, idx) => ({
+				id: `bd-${idx}`,
+				backdropUrl: `https://image.tmdb.org/t/p/original${b.file_path}`,
+				title: show.name,
+				year,
+				overview: show.overview,
+				score: show.vote_average ?? null,
+				mediaType: "tv",
+				link: `/tv/${show.id}`,
+			}));
 		}
-		if (show.poster_path) {
-			return `https://image.tmdb.org/t/p/w780${show.poster_path}`;
-		}
-		return "/no-image.png";
-	}, [show]);
 
-	const activeSeasonNumber =
-		sortedSeasons.find((s) => s.season_number === show?.number_of_seasons)
-			?.season_number || sortedSeasons[0]?.season_number;
+		// Fallback: single hero from show backdrop/poster
+		return [
+			{
+				id: show.id,
+				backdropUrl: show.backdrop_path
+					? `https://image.tmdb.org/t/p/original${show.backdrop_path}`
+					: show.poster_path
+					? `https://image.tmdb.org/t/p/original${show.poster_path}`
+					: "/no-image.png",
+				title: show.name,
+				year,
+				overview: show.overview,
+				score: show.vote_average ?? null,
+				mediaType: "tv",
+				link: `/tv/${show.id}`,
+			},
+		];
+	}, [show, year, backdropImages]);
 
-	const handleSeasonChange = (seasonNumber: number) => {
-		if (!show) return;
-		navigate(`/tv/${show.id}/season/${seasonNumber}`);
-	};
-
+	/* -----------------------------------------------------
+	   RENDER GUARDS
+	----------------------------------------------------- */
 	if (!id || Number.isNaN(tvId)) {
-		return (
-			<div className="py-10 text-center text-muted">
-				Invalid TV show ID in URL.
-			</div>
-		);
+		return <div className="pt-5 text-center text-muted">Invalid TV ID.</div>;
 	}
 
 	if (loading && !show) {
-		return (
-			<div className="py-10 text-center text-muted">
-				Loading TV show details…
-			</div>
-		);
+		return <div className="pt-5 text-center text-muted">Loading TV show…</div>;
 	}
 
 	if (error && !show) {
 		return (
-			<div className="py-10 text-center text-red-400">
+			<div className="pt-5 text-center text-red-400">
 				Failed to load TV show: {error}
 			</div>
 		);
 	}
 
-	if (!show) return null;
+	if (!show) {
+		return (
+			<div className="pt-5 text-center text-muted">
+				No TV show data available.
+			</div>
+		);
+	}
 
+	/* -----------------------------------------------------
+	   MAIN RENDER
+	----------------------------------------------------- */
 	return (
 		<motion.div
 			initial={{ opacity: 0 }}
 			animate={{ opacity: 1 }}
-			className="pb-10"
+			className="min-h-screen bg-background pt-5 pb-10"
 		>
 			{/* HERO */}
-			<section className="relative -mx-4 mb-8 overflow-hidden bg-gradient-to-b from-background to-page sm:mx-0">
-				<div className="absolute inset-0">
-					<div
-						className="h-full w-full bg-cover bg-center opacity-40"
-						style={{ backgroundImage: `url(${heroBackdrop})` }}
-					/>
-					<div className="absolute inset-0 bg-gradient-to-t from-page via-page/60 to-transparent" />
-				</div>
-
-				<div className="relative mx-auto flex max-w-7xl gap-6 px-4 pb-8 pt-16 sm:px-6 lg:px-8 lg:pb-10 lg:pt-20">
-					{/* Poster */}
-					<motion.div
-						initial={{ opacity: 0, y: 30 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ duration: 0.6 }}
-						className="hidden w-40 shrink-0 overflow-hidden rounded-xl border border-token bg-surface-alt shadow-hero sm:block md:w-52 lg:w-64"
-					>
-						<img
-							src={
-								show.poster_path
-									? `https://image.tmdb.org/t/p/w500${show.poster_path}`
-									: "/no-image.png"
-							}
-							alt={show.name}
-							className="h-full w-full object-cover"
-						/>
-					</motion.div>
-
-					{/* Text content */}
-					<motion.div
-						initial={{ opacity: 0, y: 30 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ duration: 0.6, delay: 0.1 }}
-						className="relative flex flex-1 flex-col gap-4"
-					>
-						<div className="flex flex-wrap items-center gap-3">
-							{show.tagline && (
-								<span className="text-xs font-medium uppercase tracking-[0.2em] text-accent">
-									{show.tagline}
-								</span>
-							)}
-							{show.status && <Badge>{show.status}</Badge>}
-						</div>
-
-						<h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-							{show.name}
-							{year && (
-								<span className="ml-2 text-2xl font-normal text-muted">
-									({year})
-								</span>
-							)}
-						</h1>
-
-						<div className="flex flex-wrap items-center gap-3 text-sm text-muted">
-							{show.genres && show.genres.length > 0 && (
-								<span>{show.genres.map((g) => g.name).join(" · ")}</span>
-							)}
-							{show.number_of_seasons != null &&
-								show.number_of_episodes != null && (
-									<>
-										<span className="h-1 w-1 rounded-full bg-muted/60" />
-										<span>
-											{show.number_of_seasons} seasons ·{" "}
-											{show.number_of_episodes} episodes
-										</span>
-									</>
-								)}
-						</div>
-
-						<div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
-							<div className="flex items-center gap-2">
-								<span className="flex h-9 w-9 items-center justify-center rounded-full bg-yellow-400/90 text-sm font-semibold text-black shadow-card">
-									★
-								</span>
-								<div className="leading-tight">
-									<p className="text-xs uppercase tracking-wide text-muted">
-										User score
-									</p>
-									<p className="text-sm font-semibold text-foreground">
-										{score} / 10
-									</p>
-								</div>
-							</div>
-
-							{show.homepage && (
-								<a
-									href={show.homepage}
-									target="_blank"
-									rel="noreferrer"
-									className="text-xs font-medium text-accent hover:underline"
-								>
-									Official site →
-								</a>
-							)}
-						</div>
-
-						{show.overview && (
-							<div className="mt-3 max-w-3xl text-sm text-muted">
-								<p>{show.overview}</p>
-							</div>
-						)}
-					</motion.div>
-				</div>
-			</section>
-
-			<section className="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,1.2fr)] lg:px-8">
-				{/* Left column */}
-				<div className="space-y-6">
-					{/* Seasons */}
-					{sortedSeasons.length > 0 && (
-						<Surface>
-							<SectionHeader title="Seasons" eyebrow="Episodes & arcs" />
-							<SeasonCarousel
-								seasons={sortedSeasons}
-								activeSeason={activeSeasonNumber}
-								onSeasonChange={handleSeasonChange}
-							/>
-						</Surface>
-					)}
-
-					{/* Cast */}
-					{topCast.length > 0 && (
-						<Surface>
-							<SectionHeader
-								title="Series Cast"
-								eyebrow="Cast"
-								actionSlot={
-									cast.length > topCast.length ? (
-										<span className="text-xs text-muted">
-											Showing {topCast.length} of {cast.length}
-										</span>
-									) : null
+			<ParallaxHero slides={heroSlides}>
+				{() => (
+					<div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
+						{/* Poster */}
+						<div className="hidden w-40 shrink-0 overflow-hidden rounded-xl border border-token bg-surface-alt shadow-hero sm:block md:w-52 lg:w-50">
+							<img
+								src={
+									show.poster_path
+										? `https://image.tmdb.org/t/p/w500${show.poster_path}`
+										: "/no-image.png"
 								}
+								alt={show.name}
+								className="h-full w-full object-cover"
 							/>
-							<CastCarousel cast={topCast} />
-						</Surface>
-					)}
+						</div>
 
-					{/* Trailers */}
-					{trailerVideos.length > 0 && (
-						<Surface>
-							<SectionHeader title="Videos" eyebrow="Trailers & Clips" />
-							<TrailerCarousel videos={trailerVideos} />
-						</Surface>
-					)}
+						{/* Title & Overview */}
+						<div className="flex flex-1 flex-col gap-4">
+							<h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
+								{show.name}
+								{year && (
+									<span className="ml-2 text-2xl font-normal text-muted">
+										({year})
+									</span>
+								)}
+							</h1>
 
-					{/* Reviews */}
-					{mainReviews.length > 0 && (
-						<Surface>
-							<SectionHeader
-								title="Social & Reviews"
-								eyebrow="What people are saying"
-							/>
-							<div className="space-y-4">
-								{mainReviews.map((review) => (
-									<div
-										key={review.id}
-										className="rounded-lg border border-token bg-surface-alt p-3 text-sm"
-									>
-										<div className="mb-1 flex items-center justify-between gap-2 text-xs text-muted">
-											<span className="font-medium">
-												{review.author_details.username ||
-													review.author ||
-													"Anonymous"}
-											</span>
-											{review.author_details.rating != null && (
-												<span className="flex items-center gap-1">
-													<span className="text-yellow-400 text-sm">★</span>
-													{review.author_details.rating}/10
-												</span>
-											)}
-										</div>
-										<p className="line-clamp-4 text-sm text-foreground/90">
-											{review.content}
-										</p>
-										<a
-											href={review.url}
-											target="_blank"
-											rel="noreferrer"
-											className="mt-2 inline-block text-xs text-accent hover:underline"
-										>
-											Read full review →
-										</a>
-									</div>
-								))}
-							</div>
-						</Surface>
-					)}
-				</div>
+							{show.tagline && (
+								<p className="text-sm font-medium italic text-muted">
+									{show.tagline}
+								</p>
+							)}
 
-				{/* Right column */}
-				<div className="space-y-6">
+							{show.overview && (
+								<p className="max-w-3xl text-sm text-muted">{show.overview}</p>
+							)}
+						</div>
+					</div>
+				)}
+			</ParallaxHero>
+
+			{/* MAIN CONTENT GRID */}
+			<section className="mx-auto mt-8 max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
+				{/* Row 1: Facts + Providers (50/50 desktop, stacked mobile) */}
+				<div className="grid gap-6 lg:grid-cols-2">
+					{/* FACTS */}
 					<Surface>
-						<SectionHeader title="Facts" eyebrow="Details" />
-						<div className="space-y-3 text-sm text-muted">
+						<SectionHeader title="Details" eyebrow="Facts" />
+						<div className="grid gap-3 text-sm text-muted sm:grid-cols-2">
 							{show.status && (
-								<p>
+								<div>
 									<span className="font-medium text-foreground">Status: </span>
 									{show.status}
-								</p>
+								</div>
 							)}
 							{show.first_air_date && (
-								<p>
+								<div>
 									<span className="font-medium text-foreground">
-										First Air:{" "}
+										First Air Date:{" "}
 									</span>
 									{show.first_air_date}
-								</p>
+								</div>
 							)}
 							{show.last_air_date && (
-								<p>
+								<div>
 									<span className="font-medium text-foreground">
-										Last Air:{" "}
+										Last Air Date:{" "}
 									</span>
 									{show.last_air_date}
-								</p>
+								</div>
+							)}
+							{show.number_of_episodes != null && (
+								<div>
+									<span className="font-medium text-foreground">
+										Episodes:{" "}
+									</span>
+									{show.number_of_episodes}
+								</div>
+							)}
+							{show.number_of_seasons != null && (
+								<div>
+									<span className="font-medium text-foreground">Seasons: </span>
+									{show.number_of_seasons}
+								</div>
+							)}
+							{show.genres && show.genres.length > 0 && (
+								<div>
+									<span className="font-medium text-foreground">Genres: </span>
+									{show.genres.map((g) => g.name).join(", ")}
+								</div>
 							)}
 							{show.popularity != null && (
-								<p>
+								<div>
 									<span className="font-medium text-foreground">
 										Popularity:{" "}
 									</span>
 									{Math.round(show.popularity)}
-								</p>
+								</div>
+							)}
+							{show.original_language && (
+								<div>
+									<span className="font-medium text-foreground">
+										Original Language:{" "}
+									</span>
+									{show.original_language.toUpperCase()}
+								</div>
+							)}
+							{show.homepage && (
+								<div className="sm:col-span-2">
+									<span className="font-medium text-foreground">Website: </span>
+									<a
+										href={show.homepage}
+										target="_blank"
+										rel="noreferrer"
+										className="text-accent hover:underline"
+									>
+										Official Site
+									</a>
+								</div>
 							)}
 						</div>
 					</Surface>
 
-					{countryProviders && (
-						<Surface>
-							<SectionHeader title="Where to Watch" eyebrow="Providers" />
+					{/* PROVIDERS */}
+					<Surface>
+						<SectionHeader title="Where to Watch" eyebrow="Providers" />
+						{countryProviders ? (
 							<div className="space-y-3 text-sm text-muted">
 								{countryProviders.flatrate && (
 									<div>
@@ -464,12 +391,63 @@ export default function TvDetails() {
 									</div>
 								)}
 							</div>
-						</Surface>
-					)}
+						) : (
+							<p className="text-sm text-muted">No provider data available.</p>
+						)}
+					</Surface>
 				</div>
+
+				{/* Row 2: Seasons (full width) */}
+				{show.seasons && show.seasons.length > 0 && (
+					<Surface>
+						<SectionHeader title="Seasons" eyebrow="Episodes" />
+						<SeasonCarousel seasons={show.seasons} tvId={tvId} />
+					</Surface>
+				)}
+
+				{/* Row 2.5: Images (full width, hybrid gallery) */}
+				{backdropImages.length > 0 ||
+				posterImages.length > 0 ||
+				logoImages.length > 0 ? (
+					<Surface>
+						<SectionHeader title="Images" eyebrow="Gallery" />
+						<ImageGallery
+							backdrops={backdropImages}
+							posters={posterImages}
+							logos={logoImages}
+						/>
+					</Surface>
+				) : null}
+
+				{/* Row 3: Cast */}
+				{topCast.length > 0 && (
+					<Surface>
+						<SectionHeader title="Series Cast" eyebrow="Cast" />
+						<CastCarousel cast={topCast} />
+					</Surface>
+				)}
+
+				{/* Row 4: Videos */}
+				{trailerVideos.length > 0 && (
+					<Surface>
+						<SectionHeader title="Videos" eyebrow="Trailers & Clips" />
+						<TrailerCarousel videos={trailerVideos} />
+					</Surface>
+				)}
+
+				{/* Row 5: Reviews */}
+				{reviews && reviews.results && reviews.results.length > 0 && (
+					<Surface>
+						<SectionHeader
+							title="User Reviews"
+							eyebrow="What people are saying"
+						/>
+						<ReviewsList reviews={reviews.results.slice(0, 4)} />
+					</Surface>
+				)}
 			</section>
 
-			{/* Recommendations */}
+			{/* Row 6: Recommendations */}
 			{recommendations.length > 0 && (
 				<section className="mx-auto mt-8 max-w-7xl px-4 sm:px-6 lg:px-8">
 					<Surface>

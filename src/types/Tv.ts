@@ -1,5 +1,10 @@
 // src/types/Tv.ts
-import type { Genre, RecommendationsResponse } from "./Shared";
+import type {
+	Genre,
+	RecommendationsResponse,
+	CastMember,
+	CrewMember,
+} from "./Shared";
 
 /* ----------------------------------------
  * SEASONS & EPISODES
@@ -15,6 +20,10 @@ export interface Episode {
 	season_number: number;
 	vote_average?: number;
 	runtime?: number;
+
+	// ✅ NEW: per-episode people data for Step C
+	guest_stars?: CastMember[];
+	crew?: CrewMember[];
 }
 
 export interface Season {

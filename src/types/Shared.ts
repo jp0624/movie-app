@@ -141,3 +141,30 @@ export interface CombinedCredits {
 	cast: CreditEntry[];
 	crew: CreditEntry[];
 }
+
+/* ----------------------------------------
+ * IMAGES
+ * ------------------------------------- */
+
+export interface ImageAsset {
+	aspect_ratio: number;
+	file_path: string;
+	height: number;
+	width: number;
+	iso_639_1: string | null;
+	vote_average: number;
+	vote_count: number;
+}
+
+/**
+ * Generic images response used for movies, TV, seasons,
+ * episodes and people. Not all keys are always present.
+ */
+export interface ImagesResponse {
+	id: number;
+	backdrops?: ImageAsset[];
+	posters?: ImageAsset[];
+	logos?: ImageAsset[];
+	stills?: ImageAsset[];
+	profiles?: ImageAsset[];
+}

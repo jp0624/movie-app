@@ -1,9 +1,11 @@
 // src/pages/Favorites.tsx
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+
 import { useMovie } from "../contexts/MovieContext";
 import { getMovie } from "../services/api";
 import type { Movie } from "../types/Movie";
+
 import MovieGrid from "../components/media/MovieGrid";
 import MovieSkeleton from "../components/media/MovieSkeleton";
 
@@ -19,9 +21,12 @@ export default function Favorites() {
 				return;
 			}
 			setLoading(true);
-			const data = await Promise.all(favorites.map((id) => getMovie(id)));
-			setMovies(data);
-			setLoading(false);
+			try {
+				const data = await Promise.all(favorites.map((id) => getMovie(id)));
+				setMovies(data);
+			} finally {
+				setLoading(false);
+			}
 		};
 		void load();
 	}, [favorites]);
@@ -36,26 +41,30 @@ export default function Favorites() {
 		<motion.div
 			initial={{ opacity: 0 }}
 			animate={{ opacity: 1 }}
-			className="px-4 py-6 bg-zinc-950 min-h-screen text-zinc-100"
+			className="min-h-screen bg-background pt-20 pb-10"
 		>
-			<section className="max-w-4xl mx-auto">
-				<h1 className="text-3xl md:text-4xl font-bold mb-4">Your Favorites</h1>
+			<section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+				<h1 className="text-2xl sm:text-3xl font-semibold text-foreground mb-4 sm:mb-6">
+					Your Favorites
+				</h1>
 
 				{loading && (
-					<div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mt-4">
-						{Array.from({ length: 6 }).map((_, i) => (
+					<div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+						{Array.from({ length: 10 }).map((_, i) => (
 							<MovieSkeleton key={i} />
 						))}
 					</div>
 				)}
 
 				{!loading && sorted.length === 0 && (
-					<p className="mt-8 text-center text-zinc-400">
+					<p className="mt-8 text-center text-muted">
 						No favorites yet. Start adding some movies you love!
 					</p>
 				)}
 
-				{!loading && sorted.length > 0 && <MovieGrid movies={sorted} />}
+				{!loading && sorted.length > 0 && (
+					<MovieGrid movies={sorted} className="mt-4" />
+				)}
 			</section>
 		</motion.div>
 	);

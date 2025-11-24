@@ -105,3 +105,6 @@ body {
 .shadow-card {
 	box-shadow: var(--shadow-card);
 }
+.grid > * {
+	min-height: 1px;
+}

@@ -12,6 +12,7 @@ import type {
 	VideosResponse,
 	ReviewsResponse,
 	WatchProvidersResponse,
+	ImagesResponse, // ✅ NEW
 } from "../types/Shared";
 
 const BASE_URL = import.meta.env.VITE_TMDB_BASE_URL;
@@ -106,6 +107,9 @@ export const getMovieRecommendations = (id: number) =>
 export const getMovieWatchProviders = (id: number) =>
 	fetchJson<WatchProvidersResponse>(`/movie/${id}/watch/providers`);
 
+export const getMovieImages = (id: number) =>
+	fetchJson<ImagesResponse>(`/movie/${id}/images`);
+
 /* ---------------------------------------------
    TV — LISTS
 --------------------------------------------- */
@@ -146,6 +150,9 @@ export const getTvRecommendations = (id: number) =>
 export const getTvWatchProviders = (id: number) =>
 	fetchJson<WatchProvidersResponse>(`/tv/${id}/watch/providers`);
 
+export const getTvImages = (id: number) =>
+	fetchJson<ImagesResponse>(`/tv/${id}/images`);
+
 /* ---------------------------------------------
    TV — SEASONS / EPISODES
 --------------------------------------------- */
@@ -165,6 +172,18 @@ export const getTvEpisodeVideos = (
 		`/tv/${id}/season/${season}/episode/${episode}/videos`
 	);
 
+export const getTvSeasonImages = (id: number, season: number) =>
+	fetchJson<ImagesResponse>(`/tv/${id}/season/${season}/images`);
+
+export const getTvEpisodeImages = (
+	id: number,
+	season: number,
+	episode: number
+) =>
+	fetchJson<ImagesResponse>(
+		`/tv/${id}/season/${season}/episode/${episode}/images`
+	);
+
 /* ---------------------------------------------
    PERSON
 --------------------------------------------- */
@@ -174,9 +193,19 @@ export const getPerson = (id: number) => fetchJson<Person>(`/person/${id}`);
 export const getPersonCombinedCredits = (id: number) =>
 	fetchJson<CombinedCredits>(`/person/${id}/combined_credits`);
 
+export const getPersonImages = (id: number) =>
+	fetchJson<ImagesResponse>(`/person/${id}/images`);
+
 /* ---------------------------------------------
    MULTI SEARCH
 --------------------------------------------- */
 
 export const searchMulti = (query: string, page = 1) =>
 	fetchJson<PagedResponse<any>>("/search/multi", { query, page });
+
+/* ---------------------------------------------
+   TRENDING ALL (for Hero)
+--------------------------------------------- */
+
+export const getTrendingAll = (page = 1) =>
+	fetchJson<PagedResponse<Movie | TvShow>>("/trending/all/week", { page });

@@ -1,5 +1,6 @@
 // src/pages/Home.tsx
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
 import type { Movie } from "../types/Movie";
@@ -19,20 +20,26 @@ import {
 } from "../services/api";
 
 import MovieGrid from "../components/media/MovieGrid";
-import Tabs from "../components/Tabs"; // your 4-tab component (Popular / Top Rated / Trending / Now Playing / On The Air)
+import Tabs from "../components/Tabs";
 import useDebounce from "../hooks/useDebounce";
 import useInfiniteScroll from "../hooks/useInfiniteScroll";
 import MovieSkeleton from "../components/media/MovieSkeleton";
+import ParallaxHero, {
+	type HeroSlide,
+} from "../components/layout/ParallaxHero";
 
 type Mode = "movie" | "tv";
 
 export default function Home() {
+	/* --------------------------------------------------
+	   State
+	-------------------------------------------------- */
 	const [mode, setMode] = useState<Mode>(() => {
-		if (typeof window !== "undefined") {
-			const stored = window.sessionStorage.getItem("mediaMode");
-			if (stored === "movie" || stored === "tv") return stored;
-		}
-		return "movie";
+		const stored =
+			typeof window !== "undefined"
+				? window.sessionStorage.getItem("mediaMode")
+				: null;
+		return stored === "tv" ? "tv" : "movie";
 	});
 
 	const [query, setQuery] = useState(() => {
@@ -41,7 +48,6 @@ export default function Home() {
 		}
 		return "";
 	});
-
 	const debounced = useDebounce(query, 350);
 
 	const [tab, setTab] = useState("Popular");
@@ -49,32 +55,112 @@ export default function Home() {
 	const [page, setPage] = useState(1);
 	const [isLoading, setIsLoading] = useState(false);
 	const [hasMore, setHasMore] = useState(true);
+	const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
 
-	// Persist search & mode
+	// Hero slides (separate arrays for movies vs TV)
+	const [heroMovieSlides, setHeroMovieSlides] = useState<HeroSlide[]>([]);
+	const [heroTvSlides, setHeroTvSlides] = useState<HeroSlide[]>([]);
+
+	/* --------------------------------------------------
+	   Persist selections
+	-------------------------------------------------- */
 	useEffect(() => {
-		if (typeof window !== "undefined") {
-			window.sessionStorage.setItem("search", query);
-		}
+		window.sessionStorage.setItem("search", query);
 	}, [query]);
 
 	useEffect(() => {
-		if (typeof window !== "undefined") {
-			window.sessionStorage.setItem("mediaMode", mode);
-		}
+		window.sessionStorage.setItem("mediaMode", mode);
 	}, [mode]);
 
-	// Reset list when tab / search / mode changes
+	/* --------------------------------------------------
+	   Load Hero (Top 10 trending Movies + TV)
+	-------------------------------------------------- */
+	useEffect(() => {
+		let cancelled = false;
+
+		const loadHero = async () => {
+			try {
+				const [movieTrend, tvTrend] = await Promise.all([
+					getTrending(1),
+					getTrendingTv(1),
+				]);
+
+				if (cancelled) return;
+
+				const movies = (movieTrend.results ?? [])
+					.slice(0, 10)
+					.map<HeroSlide>((m) => ({
+						id: m.id,
+						backdropUrl: m.backdrop_path
+							? `https://image.tmdb.org/t/p/original${m.backdrop_path}`
+							: m.poster_path
+							? `https://image.tmdb.org/t/p/w780${m.poster_path}`
+							: "/no-image.png",
+						posterUrl: m.poster_path
+							? `https://image.tmdb.org/t/p/w500${m.poster_path}`
+							: undefined,
+						title: m.title || m.name,
+						year: m.release_date ? m.release_date.split("-")[0] : undefined,
+						overview: m.overview,
+						score: m.vote_average ?? null,
+						mediaType: "movie",
+						link: `/movie/${m.id}`,
+						extra: m,
+					}));
+
+				const tv = (tvTrend.results ?? []).slice(0, 10).map<HeroSlide>((t) => ({
+					id: t.id,
+					backdropUrl: t.backdrop_path
+						? `https://image.tmdb.org/t/p/original${t.backdrop_path}`
+						: t.poster_path
+						? `https://image.tmdb.org/t/p/w780${t.poster_path}`
+						: "/no-image.png",
+					posterUrl: t.poster_path
+						? `https://image.tmdb.org/t/p/w500${t.poster_path}`
+						: undefined,
+					title: t.name || t.original_name,
+					year: t.first_air_date ? t.first_air_date.split("-")[0] : undefined,
+					overview: t.overview,
+					score: t.vote_average ?? null,
+					mediaType: "tv",
+					link: `/tv/${t.id}`,
+					extra: t,
+				}));
+
+				setHeroMovieSlides(movies);
+				setHeroTvSlides(tv);
+			} catch {
+				// Hero is "nice to have" — fail silently, grid still works.
+			}
+		};
+
+		void loadHero();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	const activeHeroSlides = mode === "movie" ? heroMovieSlides : heroTvSlides;
+
+	/* --------------------------------------------------
+	   Reset Grid when search/mode/tab changes
+	-------------------------------------------------- */
 	useEffect(() => {
 		setItems([]);
 		setPage(1);
 		setHasMore(true);
+		setIsInitialLoadDone(false);
 	}, [tab, debounced, mode]);
 
+	/* --------------------------------------------------
+	   Load Main Grid
+	-------------------------------------------------- */
 	useEffect(() => {
 		let cancelled = false;
 
 		const load = async () => {
 			if (!hasMore) return;
+
 			setIsLoading(true);
 
 			try {
@@ -86,22 +172,26 @@ export default function Home() {
 				if (mode === "movie") {
 					if (searching) {
 						data = await searchMovies(debounced, currentPage);
+					} else if (tab === "Popular") {
+						data = await getPopular(currentPage);
+					} else if (tab === "Top Rated") {
+						data = await getTopRated(currentPage);
+					} else if (tab === "Trending") {
+						data = await getTrending(currentPage);
 					} else {
-						if (tab === "Popular") data = await getPopular(currentPage);
-						else if (tab === "Top Rated") data = await getTopRated(currentPage);
-						else if (tab === "Trending") data = await getTrending(currentPage);
-						else data = await getNowPlaying(currentPage);
+						data = await getNowPlaying(currentPage);
 					}
 				} else {
 					if (searching) {
 						data = await searchTv(debounced, currentPage);
+					} else if (tab === "Popular") {
+						data = await getPopularTv(currentPage);
+					} else if (tab === "Top Rated") {
+						data = await getTopRatedTv(currentPage);
+					} else if (tab === "Trending") {
+						data = await getTrendingTv(currentPage);
 					} else {
-						if (tab === "Popular") data = await getPopularTv(currentPage);
-						else if (tab === "Top Rated")
-							data = await getTopRatedTv(currentPage);
-						else if (tab === "Trending")
-							data = await getTrendingTv(currentPage);
-						else data = await getOnTheAirTv(currentPage);
+						data = await getOnTheAirTv(currentPage);
 					}
 				}
 
@@ -120,76 +210,126 @@ export default function Home() {
 				});
 
 				setHasMore(results.length > 0);
+
+				if (!isInitialLoadDone) setIsInitialLoadDone(true);
 			} finally {
 				if (!cancelled) setIsLoading(false);
 			}
 		};
 
 		void load();
-
 		return () => {
 			cancelled = true;
 		};
-	}, [page, tab, debounced, mode, hasMore]);
+	}, [page, tab, debounced, mode, hasMore, isInitialLoadDone]);
 
-	// Infinite scroll
+	/* --------------------------------------------------
+	   Infinite Scroll
+	-------------------------------------------------- */
 	useInfiniteScroll(() => {
-		if (!isLoading && hasMore) {
-			setPage((p) => p + 1);
-		}
+		if (!isInitialLoadDone) return;
+		if (!isLoading && hasMore) setPage((p) => p + 1);
 	});
 
+	/* --------------------------------------------------
+	   Render
+	-------------------------------------------------- */
 	return (
 		<motion.div
 			initial={{ opacity: 0 }}
 			animate={{ opacity: 1 }}
-			className="min-h-screen bg-background pb-10"
+			className="min-h-screen bg-background pt-20 pb-10"
 		>
-			<section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
-				{/* Title + Mode toggle */}
-				<div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
-					<motion.h1
-						initial={{ y: 20, opacity: 0 }}
-						animate={{ y: 0, opacity: 1 }}
-						transition={{ duration: 0.5, ease: "easeOut" }}
-						className="text-2xl font-semibold text-foreground sm:text-3xl"
-					>
-						Discover {mode === "movie" ? "Movies" : "TV Shows"}
-					</motion.h1>
+			<section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+				{/* ----------------------------------------------
+				   HERO (Parallax + Glass + Slideshow)
+				---------------------------------------------- */}
+				{activeHeroSlides.length > 0 && (
+					<div className="mb-7">
+						<ParallaxHero slides={activeHeroSlides} autoAdvanceMs={5000}>
+							{({ slide, isMulti }) => (
+								<>
+									<p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+										Trending {slide.mediaType === "tv" ? "Series" : "Movie"}
+									</p>
 
-					{/* Movie / TV toggle (Mac-style pill) */}
-					<div className="inline-flex rounded-full bg-surface-alt border border-token px-1 py-1 text-xs shadow-card">
-						<button
-							type="button"
-							onClick={() => setMode("movie")}
-							className={`relative z-10 rounded-full px-3 py-1 transition-colors ${
-								mode === "movie"
-									? "bg-background text-foreground shadow-card"
-									: "text-muted hover:text-foreground"
-							}`}
-						>
-							Movies
-						</button>
-						<button
-							type="button"
-							onClick={() => setMode("tv")}
-							className={`relative z-10 rounded-full px-3 py-1 transition-colors ${
-								mode === "tv"
-									? "bg-background text-foreground shadow-card"
-									: "text-muted hover:text-foreground"
-							}`}
-						>
-							TV Shows
-						</button>
+									{isMulti ? (
+										<h1 className="max-w-xl text-2xl font-semibold text-foreground sm:text-3xl lg:text-4xl">
+											{slide.title ?? "Untitled"}
+											{slide.year && (
+												<span className="ml-2 text-lg font-normal text-muted">
+													({slide.year})
+												</span>
+											)}
+										</h1>
+									) : (
+										<h2 className="max-w-xl text-2xl font-semibold text-foreground sm:text-3xl lg:text-4xl">
+											{slide.title ?? "Untitled"}
+											{slide.year && (
+												<span className="ml-2 text-lg font-normal text-muted">
+													({slide.year})
+												</span>
+											)}
+										</h2>
+									)}
+
+									{slide.overview && (
+										<p className="mt-3 max-w-xl text-sm text-muted line-clamp-3">
+											{slide.overview}
+										</p>
+									)}
+
+									<div className="mt-3 flex items-center gap-3 text-xs text-muted">
+										{slide.score != null && (
+											<span className="flex items-center gap-1">
+												<span className="text-base text-yellow-400">★</span>
+												{slide.score.toFixed(1)} / 10
+											</span>
+										)}
+									</div>
+
+									<div className="mt-5">
+										{slide.link && (
+											<Link
+												to={slide.link}
+												className="inline-flex items-center rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white shadow-card transition-colors hover:bg-accent-soft"
+											>
+												View details
+											</Link>
+										)}
+									</div>
+								</>
+							)}
+						</ParallaxHero>
 					</div>
+				)}
+
+				{/* ----------------------------------------------
+				   TITLE + MODE TOGGLE
+				---------------------------------------------- */}
+				<div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+					<h2 className="text-2xl font-semibold text-foreground sm:text-3xl">
+						Discover {mode === "movie" ? "Movies" : "TV Shows"}
+					</h2>
+
+					{/* ----------------------------------------------
+				   TABS
+				---------------------------------------------- */}
+					<Tabs
+						tabs={[
+							{ id: "movie", label: "Movies" },
+							{ id: "tv", label: "TV Shows" },
+						]}
+						value={mode}
+						onChange={(id) => setMode(id as "movie" | "tv")}
+					/>
 				</div>
 
-				{/* Search */}
-				<motion.form
+				{/* ----------------------------------------------
+				   SEARCH BAR
+				---------------------------------------------- */}
+				<form
 					onSubmit={(e) => e.preventDefault()}
-					initial={{ opacity: 0, y: 10 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.4 }}
 					className="relative mb-4 sm:mb-6"
 				>
 					<input
@@ -205,17 +345,15 @@ export default function Home() {
 							type="button"
 							onClick={() => setQuery("")}
 							className="absolute right-3 top-1/2 -translate-y-1/2 text-lg text-muted hover:text-foreground"
-							aria-label="Clear search"
 						>
 							×
 						</button>
 					)}
-				</motion.form>
+				</form>
 
-				{/* Tabs (Popular, Top Rated, Trending, Now Playing / On The Air) */}
-				<Tabs active={tab} setActive={setTab} />
-
-				{/* Grid */}
+				{/* ----------------------------------------------
+				   GRID
+				---------------------------------------------- */}
 				{items.length === 0 && isLoading ? (
 					<div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
 						{Array.from({ length: 10 }).map((_, i) => (
@@ -223,14 +361,9 @@ export default function Home() {
 						))}
 					</div>
 				) : (
-					<MovieGrid
-						movies={items as Movie[]}
-						mediaType={mode}
-						className="mt-6"
-					/>
+					<MovieGrid movies={items} mediaType={mode} className="mt-6" />
 				)}
 
-				{/* Loading more shimmer */}
 				{isLoading && items.length > 0 && (
 					<div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
 						{Array.from({ length: 5 }).map((_, i) => (
@@ -240,7 +373,7 @@ export default function Home() {
 				)}
 			</section>
 
-			{/* Infinite scroll trigger */}
+			{/* Infinite scroll anchor */}
 			<div id="infinite-trigger" className="h-12" />
 		</motion.div>
 	);
