@@ -1,64 +1,43 @@
-import {
-	createContext,
-	useContext,
-	useState,
-	useEffect,
-	ReactNode,
-} from "react";
+// src/contexts/MovieContext.tsx
+import { createContext, useContext, useState } from "react";
 
-interface MovieContextType {
+interface MovieCtx {
 	favorites: number[];
-	toggleFavorite: (id: number) => void;
-
-	ratings: Record<number, number>;
-	setRating: (id: number, rating: number) => void;
+	addFavorite: (id: number) => void;
+	removeFavorite: (id: number) => void;
 }
 
-const MovieContext = createContext<MovieContextType | null>(null);
+const MovieContext = createContext<MovieCtx | null>(null);
 
-export function MovieProvider({ children }: { children: ReactNode }) {
+export function MovieProvider({ children }: { children: React.ReactNode }) {
 	const [favorites, setFavorites] = useState<number[]>(() => {
-		const stored = localStorage.getItem("favorites");
-		return stored ? JSON.parse(stored) : [];
+		try {
+			return JSON.parse(localStorage.getItem("favorites") ?? "[]");
+		} catch {
+			return [];
+		}
 	});
 
-	const [ratings, setRatings] = useState<Record<number, number>>(() => {
-		const stored = localStorage.getItem("ratings");
-		return stored ? JSON.parse(stored) : {};
-	});
-
-	useEffect(() => {
-		localStorage.setItem("favorites", JSON.stringify(favorites));
-	}, [favorites]);
-
-	useEffect(() => {
-		localStorage.setItem("ratings", JSON.stringify(ratings));
-	}, [ratings]);
-
-	const toggleFavorite = (id: number) => {
-		setFavorites((prev) =>
-			prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-		);
-	};
-
-	const setRating = (id: number, rating: number) => {
-		setRatings((prev) => ({
-			...prev,
-			[id]: rating,
-		}));
-	};
+	function save(next: number[]) {
+		setFavorites(next);
+		localStorage.setItem("favorites", JSON.stringify(next));
+	}
 
 	return (
 		<MovieContext.Provider
-			value={{ favorites, toggleFavorite, ratings, setRating }}
+			value={{
+				favorites,
+				addFavorite: (id) => save([...favorites, id]),
+				removeFavorite: (id) => save(favorites.filter((x) => x !== id)),
+			}}
 		>
 			{children}
 		</MovieContext.Provider>
 	);
 }
 
-export function useMovie() {
+export function useMovieContext() {
 	const ctx = useContext(MovieContext);
-	if (!ctx) throw new Error("useMovie must be inside <MovieProvider>");
+	if (!ctx) throw new Error("useMovieContext must be inside <MovieProvider>");
 	return ctx;
 }

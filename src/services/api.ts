@@ -12,12 +12,11 @@ import type {
 	VideosResponse,
 	ReviewsResponse,
 	WatchProvidersResponse,
-	ImagesResponse, // ✅ NEW
+	ImagesResponse,
 } from "../types/Shared";
 
-const BASE_URL = import.meta.env.VITE_TMDB_BASE_URL;
-
-// TMDB v4 AUTH token (Bearer)
+const BASE_URL =
+	import.meta.env.VITE_TMDB_BASE_URL || "https://api.themoviedb.org/3";
 const AUTH_TOKEN = import.meta.env.VITE_TMDB_KEY;
 
 if (!AUTH_TOKEN) {
@@ -32,45 +31,55 @@ const defaultOptions: RequestInit = {
 	},
 };
 
-function buildUrl(
-	path: string,
-	params?: Record<string, string | number | undefined>
-): string {
-	const url = new URL(BASE_URL + path);
-	if (params) {
-		for (const [key, value] of Object.entries(params)) {
-			if (value !== undefined && value !== null) {
-				url.searchParams.set(key, String(value));
-			}
+function url(path: string, params?: Record<string, any>): string {
+	const u = new URL(BASE_URL + path);
+
+	// default region for watch providers
+	if (path.includes("watch/providers")) {
+		u.searchParams.set("watch_region", "CA");
+	}
+
+	for (const [k, v] of Object.entries(params ?? {})) {
+		if (v !== undefined && v !== null) {
+			u.searchParams.set(k, String(v));
 		}
 	}
-	return url.toString();
+
+	return u.toString();
 }
 
-async function fetchJson<T>(
-	path: string,
-	params?: Record<string, string | number | undefined>
-): Promise<T> {
-	const url = buildUrl(path, params);
-	const res = await fetch(url, defaultOptions);
-	if (!res.ok) {
-		throw new Error(`TMDB API error: ${res.status} ${res.statusText}`);
+async function fetchJson<T>(path: string, params?: any): Promise<T> {
+	const full = url(path, params);
+
+	try {
+		const res = await fetch(full, defaultOptions);
+
+		if (!res.ok) {
+			// return empty object instead of crashing
+			console.warn("TMDB error", res.status, full);
+			return {} as T;
+		}
+
+		return (await res.json()) as T;
+	} catch (err) {
+		console.error("TMDB fetch failed:", err);
+		return {} as T;
 	}
-	return res.json() as Promise<T>;
 }
 
-// Generic paged response
-interface PagedResponse<T> {
-	page: number;
+/* ---------------------------------------------
+   GENERIC PAGED RESULT
+--------------------------------------------- */
+export interface PagedResponse<T> {
+	page?: number;
 	results: T[];
-	total_pages: number;
-	total_results: number;
+	total_pages?: number;
+	total_results?: number;
 }
 
 /* ---------------------------------------------
    MOVIE — LISTS
 --------------------------------------------- */
-
 export const getPopular = (page = 1) =>
 	fetchJson<PagedResponse<Movie>>("/movie/popular", { page });
 
@@ -89,7 +98,6 @@ export const searchMovies = (query: string, page = 1) =>
 /* ---------------------------------------------
    MOVIE — DETAILS
 --------------------------------------------- */
-
 export const getMovie = (id: number) => fetchJson<Movie>(`/movie/${id}`);
 
 export const getMovieCredits = (id: number) =>
@@ -113,7 +121,6 @@ export const getMovieImages = (id: number) =>
 /* ---------------------------------------------
    TV — LISTS
 --------------------------------------------- */
-
 export const getPopularTv = (page = 1) =>
 	fetchJson<PagedResponse<TvShow>>("/tv/popular", { page });
 
@@ -132,7 +139,6 @@ export const searchTv = (query: string, page = 1) =>
 /* ---------------------------------------------
    TV — DETAILS
 --------------------------------------------- */
-
 export const getTv = (id: number) => fetchJson<TvShow>(`/tv/${id}`);
 
 export const getTvCredits = (id: number) =>
@@ -156,38 +162,24 @@ export const getTvImages = (id: number) =>
 /* ---------------------------------------------
    TV — SEASONS / EPISODES
 --------------------------------------------- */
-
 export const getTvSeason = (id: number, season: number) =>
 	fetchJson<Season>(`/tv/${id}/season/${season}`);
 
 export const getTvEpisode = (id: number, season: number, episode: number) =>
 	fetchJson<Episode>(`/tv/${id}/season/${season}/episode/${episode}`);
 
-export const getTvEpisodeVideos = (
-	id: number,
-	season: number,
-	episode: number
-) =>
-	fetchJson<VideosResponse>(
-		`/tv/${id}/season/${season}/episode/${episode}/videos`
-	);
+export const getTvEpisodeVideos = (id: number, s: number, e: number) =>
+	fetchJson<VideosResponse>(`/tv/${id}/season/${s}/episode/${e}/videos`);
 
 export const getTvSeasonImages = (id: number, season: number) =>
 	fetchJson<ImagesResponse>(`/tv/${id}/season/${season}/images`);
 
-export const getTvEpisodeImages = (
-	id: number,
-	season: number,
-	episode: number
-) =>
-	fetchJson<ImagesResponse>(
-		`/tv/${id}/season/${season}/episode/${episode}/images`
-	);
+export const getTvEpisodeImages = (id: number, s: number, e: number) =>
+	fetchJson<ImagesResponse>(`/tv/${id}/season/${s}/episode/${e}/images`);
 
 /* ---------------------------------------------
    PERSON
 --------------------------------------------- */
-
 export const getPerson = (id: number) => fetchJson<Person>(`/person/${id}`);
 
 export const getPersonCombinedCredits = (id: number) =>
@@ -199,13 +191,11 @@ export const getPersonImages = (id: number) =>
 /* ---------------------------------------------
    MULTI SEARCH
 --------------------------------------------- */
-
 export const searchMulti = (query: string, page = 1) =>
 	fetchJson<PagedResponse<any>>("/search/multi", { query, page });
 
 /* ---------------------------------------------
-   TRENDING ALL (for Hero)
+   TRENDING ALL
 --------------------------------------------- */
-
 export const getTrendingAll = (page = 1) =>
 	fetchJson<PagedResponse<Movie | TvShow>>("/trending/all/week", { page });

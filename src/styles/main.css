@@ -1,110 +1,305 @@
-/* ---------------------------------------------------------
-   Tailwind v4 Import
---------------------------------------------------------- */
-@import "tailwindcss";
+/* src/styles/main.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* ---------------------------------------------------------
-   CINEMATIC DESIGN SYSTEM — Tailwind v4 (@theme)
-   Netflix + Marvel Hybrid
---------------------------------------------------------- */
+/* -----------------------------------------
+   THEME TOKENS (Cinematic-first)
+   Applied via data-theme on <html>
+----------------------------------------- */
 
-/* ===== Light Theme (default) ===== */
-@theme {
-	--color-bg: #f5f5f7;
-	--color-bg-muted: #e8e8ec;
+:root {
+	--bg: #020108;
+	--bg-elevated: #080812;
+	--bg-elevated-soft: #0b0b16;
+	--border-subtle: #262637;
+	--border-strong: #3a3a4f;
 
-	--color-surface: #ffffff;
-	--color-surface-alt: #f2f2f4;
+	--fg: #f9fafb;
+	--fg-muted: #9ca3af;
+	--fg-soft: #6b7280;
 
-	--color-text: #1a1a1a;
-	--color-text-muted: #5c5c5c;
-	--color-text-soft: #7a7a7a;
+	--accent: #e50914;
+	--accent-soft: #f97373;
+	--accent-strong: #b20710;
 
-	--color-accent: #e50914;
-	--color-accent-soft: #ff5b66;
-
-	--color-border: #d2d2d7;
-	--color-border-strong: #b9b9bd;
-
-	--shadow-card: 0 6px 22px rgba(0, 0, 0, 0.06);
-}
-
-/* ===== Dark Theme overrides ===== */
-/* Tailwind v4 uses @theme dark — NOT nested @dark inside @theme */
-@theme dark {
-	--color-bg: #0b0b0d;
-	--color-bg-muted: #141415;
-
-	--color-surface: #18181a;
-	--color-surface-alt: #202022;
-
-	--color-text: #f5f5f7;
-	--color-text-muted: #a1a1aa;
-	--color-text-soft: #7d7d86;
-
-	--color-accent: #ff1e2d;
-	--color-accent-soft: #ff4755;
-
-	--color-border: #2a2a2e;
-	--color-border-strong: #3a3a3f;
-
-	--shadow-card: 0 6px 24px rgba(0, 0, 0, 0.45);
-}
-
-/* ---------------------------------------------------------
-   HTML / BODY — global theme behavior
---------------------------------------------------------- */
-
-html {
-	transition: background-color 0.35s ease, color 0.35s ease;
-}
-
-html[data-theme="dark"] {
-	color-scheme: dark;
+	--shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.5);
+	--radius-lg: 1rem;
+	--radius-xl: 1.25rem;
 }
 
 html[data-theme="light"] {
-	color-scheme: light;
+	--bg: #f3f4f6;
+	--bg-elevated: #ffffff;
+	--bg-elevated-soft: #f9fafb;
+	--border-subtle: #e5e7eb;
+	--border-strong: #d1d5db;
+
+	--fg: #111827;
+	--fg-muted: #4b5563;
+	--fg-soft: #6b7280;
+
+	--accent: #e50914;
+	--accent-soft: #fb7185;
+	--accent-strong: #b20710;
+
+	--shadow-soft: 0 10px 25px rgba(15, 23, 42, 0.15);
 }
+
+html[data-theme="dark"] {
+	--bg: #020617;
+	--bg-elevated: #030712;
+	--bg-elevated-soft: #050816;
+	--border-subtle: #1f2937;
+	--border-strong: #374151;
+
+	--fg: #f9fafb;
+	--fg-muted: #9ca3af;
+	--fg-soft: #6b7280;
+
+	--accent: #e50914;
+	--accent-soft: #f97373;
+	--accent-strong: #b20710;
+
+	--shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Cinematic = darker than dark */
+html[data-theme="cinematic"] {
+	--bg: #020109;
+	--bg-elevated: #05030f;
+	--bg-elevated-soft: #060515;
+	--border-subtle: #262637;
+	--border-strong: #4b4b63;
+
+	--fg: #f9fafb;
+	--fg-muted: #9ca3af;
+	--fg-soft: #6b7280;
+
+	--accent: #e50914;
+	--accent-soft: #f97373;
+	--accent-strong: #b20710;
+
+	--shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.85);
+}
+
+/* -----------------------------------------
+   GLOBAL BASE
+----------------------------------------- */
 
 body {
-	background: var(--color-bg);
-	color: var(--color-text);
-	margin: 0;
-	min-height: 100vh;
+	@apply antialiased;
+	background-color: var(--bg);
+	color: var(--fg);
 }
 
-/* ---------------------------------------------------------
-   Helper Utility Classes
---------------------------------------------------------- */
+/* Utility classes that match the Tailwind-style names
+   used throughout your JSX. These will coexist happily
+   with Tailwind utilities.
+*/
+
+.bg-background {
+	background-color: var(--bg);
+}
 
 .bg-surface {
-	background: var(--color-surface);
+	background-color: var(--bg-elevated);
 }
 
 .bg-surface-alt {
-	background: var(--color-surface-alt);
-}
-
-.text-muted {
-	color: var(--color-text-muted);
-}
-
-.text-soft {
-	color: var(--color-text-soft);
+	background-color: var(--bg-elevated-soft);
 }
 
 .border-token {
-	border-color: var(--color-border);
+	border-color: var(--border-subtle);
 }
 
 .border-token-strong {
-	border-color: var(--color-border-strong);
+	border-color: var(--border-strong);
 }
 
-.shadow-card {
-	box-shadow: var(--shadow-card);
+.text-foreground {
+	color: var(--fg);
 }
-.grid > * {
-	min-height: 1px;
+
+.text-muted {
+	color: var(--fg-muted);
+}
+
+.text-token-subtle {
+	color: var(--fg-soft);
+}
+
+.bg-accent {
+	background-color: var(--accent);
+}
+
+.bg-accent-soft {
+	background-color: var(--accent-soft);
+}
+
+.text-accent {
+	color: var(--accent);
+}
+
+/* -----------------------------------------
+   CINEMATIC CARD SHELL + OVERLAY
+   O1-A Netflix-style heavy black overlay
+----------------------------------------- */
+
+.card-shell {
+	position: relative;
+	overflow: hidden;
+	border-radius: var(--radius-xl);
+	background: radial-gradient(
+		circle at top,
+		#111322 0,
+		#050308 55%,
+		#020106 100%
+	);
+	border: 1px solid var(--border-subtle);
+	box-shadow: var(--shadow-soft);
+	transform-origin: center;
+	transition: transform 150ms ease-out, box-shadow 150ms ease-out,
+		border-color 150ms ease-out, background 150ms ease-out;
+}
+
+.card-shell::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		to top,
+		rgba(0, 0, 0, 0.98) 0%,
+		rgba(0, 0, 0, 0.92) 20%,
+		rgba(0, 0, 0, 0.6) 55%,
+		rgba(0, 0, 0, 0) 80%
+	);
+	opacity: 0.92;
+	z-index: 1;
+	pointer-events: none;
+	transition: opacity 160ms ease-out;
+}
+
+.card-shell:hover::before {
+	opacity: 1;
+}
+
+.card-shell:hover {
+	transform: translateY(-1.5px) scale(1.01);
+	border-color: var(--accent-strong);
+	box-shadow: 0 22px 55px rgba(0, 0, 0, 0.95);
+}
+
+/* Meta content sitting above the gradient */
+.card-shell-meta {
+	position: absolute;
+	left: 0.75rem;
+	right: 0.75rem;
+	bottom: 0.75rem;
+	z-index: 2;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+/* Subtle pill for ratings / tags */
+.card-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0.1rem 0.5rem;
+	border-radius: 999px;
+	background-color: rgba(15, 23, 42, 0.85);
+	color: var(--fg-muted);
+	font-size: 0.625rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+/* -----------------------------------------
+   UNIFIED ASPECT RATIOS
+   Posters: 2:3  |  Stills: 16:9
+----------------------------------------- */
+
+.poster-2-3 {
+	aspect-ratio: 2 / 3;
+	width: 100%;
+	display: block;
+	object-fit: cover;
+}
+
+.still-16-9 {
+	aspect-ratio: 16 / 9;
+	width: 100%;
+	display: block;
+	object-fit: cover;
+}
+
+/* For environments where aspect-ratio might be flaky,
+   we can ensure container behavior. */
+.poster-container,
+.still-container {
+	position: relative;
+	width: 100%;
+	overflow: hidden;
+}
+
+.poster-container {
+	aspect-ratio: 2 / 3;
+}
+
+.still-container {
+	aspect-ratio: 16 / 9;
+}
+
+/* -----------------------------------------
+   HERO BACKDROP — HEAVY BLACK OVERLAY
+----------------------------------------- */
+
+.hero-backdrop {
+	position: relative;
+	overflow: hidden;
+	border-radius: 1.5rem;
+	border: 1px solid var(--border-subtle);
+	background-color: #020107;
+	box-shadow: 0 40px 80px rgba(0, 0, 0, 0.85);
+}
+
+.hero-backdrop::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		to bottom,
+		rgba(0, 0, 0, 0.98) 0%,
+		rgba(0, 0, 0, 0.88) 35%,
+		rgba(0, 0, 0, 0.85) 60%,
+		rgba(0, 0, 0, 1) 100%
+	);
+	z-index: 1;
+}
+
+.hero-backdrop-image {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	filter: saturate(1.15) contrast(1.05) brightness(0.9);
+	transform: scale(1.02);
+}
+
+/* Content inside hero (titles, buttons) */
+.hero-backdrop-inner {
+	position: relative;
+	z-index: 2;
+}
+
+/* -----------------------------------------
+   MISC
+----------------------------------------- */
+
+.shadow-card {
+	box-shadow: var(--shadow-soft);
 }

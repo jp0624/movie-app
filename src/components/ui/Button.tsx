@@ -1,26 +1,38 @@
 // src/components/ui/Button.tsx
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import React from "react";
+import { Link } from "react-router-dom";
 
-interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-	children: ReactNode;
-	variant?: "primary" | "ghost";
+interface BaseProps {
+	children: React.ReactNode;
+	className?: string;
 }
+
+type ButtonProps = BaseProps &
+	(
+		| (React.ButtonHTMLAttributes<HTMLButtonElement> & { to?: never })
+		| ({ to: string } & React.AnchorHTMLAttributes<HTMLAnchorElement>)
+	);
 
 export default function Button({
 	children,
-	variant = "primary",
 	className = "",
-	...rest
-}: Props) {
+	...props
+}: ButtonProps) {
 	const base =
-		"inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent";
-	const styles =
-		variant === "primary"
-			? "bg-accent text-white hover:bg-accent-soft"
-			: "bg-transparent text-muted hover:text-foreground";
+		"inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition bg-foreground text-background hover:opacity-90";
 
+	// Link
+	if ("to" in props && props.to) {
+		return (
+			<Link {...props} className={`${base} ${className}`}>
+				{children}
+			</Link>
+		);
+	}
+
+	// Button
 	return (
-		<button className={`${base} ${styles} ${className}`} {...rest}>
+		<button {...props} className={`${base} ${className}`}>
 			{children}
 		</button>
 	);

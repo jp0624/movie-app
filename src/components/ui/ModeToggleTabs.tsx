@@ -1,32 +1,35 @@
 // src/components/ui/ModeToggleTabs.tsx
-import type { ReactNode } from "react";
+import React from "react";
 
-interface Option {
-	value: string;
-	label: ReactNode;
-}
-
-interface Props {
-	options: Option[];
+interface ModeToggleTabsProps {
 	value: string;
 	onChange: (value: string) => void;
+	options: { value: string; label: string }[];
 }
 
-export default function ModeToggleTabs({ options, value, onChange }: Props) {
+export default function ModeToggleTabs({
+	value,
+	onChange,
+	options,
+}: ModeToggleTabsProps) {
 	return (
-		<div className="inline-flex rounded-full bg-surface-alt border border-token px-1 py-1 text-xs shadow-card">
+		<div
+			role="tablist"
+			className="inline-flex rounded-lg border border-token bg-surface-alt overflow-hidden"
+		>
 			{options.map((opt) => {
-				const active = opt.value === value;
+				const selected = opt.value === value;
 				return (
 					<button
 						key={opt.value}
-						type="button"
-						onClick={() => onChange(opt.value)}
-						className={`relative z-10 rounded-full px-3 py-1 transition-colors ${
-							active
-								? "bg-background text-foreground shadow-card"
+						role="tab"
+						aria-selected={selected}
+						className={`px-3 py-1 text-sm ${
+							selected
+								? "bg-foreground text-background"
 								: "text-muted hover:text-foreground"
 						}`}
+						onClick={() => onChange(opt.value)}
 					>
 						{opt.label}
 					</button>

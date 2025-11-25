@@ -1,39 +1,49 @@
 // src/App.tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import { ThemeProvider } from "./contexts/ThemeContext";
-import { SettingsProvider } from "./contexts/SettingsContext";
-
 import NavBar from "./components/layout/NavBar";
-import SettingsPanel from "./components/layout/SettingsPanel";
+import SuspenseBoundary from "./components/system/SuspenseBoundary";
+import ErrorBoundary from "./components/system/ErrorBoundary";
 
-import Home from "./pages/Home";
-import SearchPage from "./pages/search/SearchPage";
-import FavoritesPage from "./pages/Favorites";
+// Home
+import Home from "./pages/Home/Home";
 
-import MovieDetails from "./pages/movie/MovieDetails";
-import TvDetails from "./pages/tv/TvDetails";
-import SeasonDetails from "./pages/tv/SeasonDetails";
-import EpisodeDetails from "./pages/tv/EpisodeDetails";
-import PersonDetails from "./pages/person/PersonDetails";
-import { MovieProvider } from "./contexts/MovieContext";
+// Favorites
+import Favorites from "./pages/Favorites/Favorites";
+
+// Movie
+import MovieDetails from "./pages/Movie/MovieDetails";
+
+// TV
+import TvDetails from "./pages/Tv/TvDetails";
+import SeasonDetails from "./pages/Tv/SeasonDetails";
+import EpisodeDetails from "./pages/Tv/EpisodeDetails";
+
+// Person
+import PersonDetails from "./pages/Person/PersonDetails";
+
+// Search
+import SearchPage from "./pages/Search/SearchPage";
 
 export default function App() {
 	return (
-		<ThemeProvider>
-			<MovieProvider>
-				<SettingsProvider>
-					<BrowserRouter>
-						<NavBar />
-						<SettingsPanel />
+		<BrowserRouter>
+			<div className="min-h-screen bg-background text-foreground">
+				<NavBar />
 
+				<ErrorBoundary>
+					<SuspenseBoundary>
 						<Routes>
+							{/* HOME */}
 							<Route path="/" element={<Home />} />
-							<Route path="/search" element={<SearchPage />} />
-							<Route path="/favorites" element={<FavoritesPage />} />
 
-							{/* DETAILS */}
+							{/* FAVORITES */}
+							<Route path="/favorites" element={<Favorites />} />
+
+							{/* MOVIE */}
 							<Route path="/movie/:id" element={<MovieDetails />} />
+
+							{/* TV */}
 							<Route path="/tv/:id" element={<TvDetails />} />
 							<Route
 								path="/tv/:id/season/:seasonNumber"
@@ -43,11 +53,16 @@ export default function App() {
 								path="/tv/:id/season/:seasonNumber/episode/:episodeNumber"
 								element={<EpisodeDetails />}
 							/>
+
+							{/* PERSON */}
 							<Route path="/person/:id" element={<PersonDetails />} />
+
+							{/* SEARCH */}
+							<Route path="/search" element={<SearchPage />} />
 						</Routes>
-					</BrowserRouter>
-				</SettingsProvider>
-			</MovieProvider>
-		</ThemeProvider>
+					</SuspenseBoundary>
+				</ErrorBoundary>
+			</div>
+		</BrowserRouter>
 	);
 }

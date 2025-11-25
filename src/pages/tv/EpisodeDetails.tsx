@@ -1,9 +1,9 @@
 // src/pages/tv/EpisodeDetails.tsx
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useMemo } from "react";
+import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
-import type { Episode } from "../../types/Tv";
+import type { Episode, Season } from "../../types/Tv";
 import type {
 	VideosResponse,
 	CreditsResponse,
@@ -13,155 +13,236 @@ import type {
 import {
 	getTvEpisode,
 	getTvEpisodeVideos,
-	getTvCredits,
 	getTvEpisodeImages,
+	getTvSeason,
+	getTvCredits,
 } from "../../services/api";
+
+import { useTmdbResource } from "../../hooks/useTmdbResource";
+import { useTmdbPreload } from "../../hooks/useTmdbPreload";
+import { tmdbBackdrop } from "../../utils/tmdbImage";
 
 import Surface from "../../components/ui/Surface";
 import SectionHeader from "../../components/ui/SectionHeader";
 import CastCarousel from "../../components/media/CastCarousel";
-import TrailerCarousel from "../../components/media/TrailerCarousel";
-import ImageGallery from "../../components/media/ImageGallery";
-
-import ParallaxHero, {
-	type HeroSlide,
-} from "../../components/layout/ParallaxHero";
+import TrailerCarousel from "../../components/media/carousels/TrailerCarousel";
+import ImageGallery from "../../components/media/info/ImageGallery";
 
 export default function EpisodeDetails() {
 	const { id, seasonNumber, episodeNumber } = useParams();
 	const tvId = Number(id);
-	const s = Number(seasonNumber);
-	const e = Number(episodeNumber);
+	const seasonNum = Number(seasonNumber);
+	const episodeNum = Number(episodeNumber);
 
-	const [episode, setEpisode] = useState<Episode | null>(null);
-	const [credits, setCredits] = useState<CreditsResponse | null>(null);
-	const [videos, setVideos] = useState<VideosResponse | null>(null);
-	const [images, setImages] = useState<ImagesResponse | null>(null);
+	/* ----------------------------------------------------
+	   FETCH — Cached TMDB Requests
+	---------------------------------------------------- */
+	const {
+		data: episode,
+		loading,
+		error,
+	} = useTmdbResource<Episode>(
+		() => getTvEpisode(tvId, seasonNum, episodeNum),
+		[tvId, seasonNum, episodeNum]
+	);
 
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const { data: videos } = useTmdbResource<VideosResponse>(
+		() => getTvEpisodeVideos(tvId, seasonNum, episodeNum),
+		[tvId, seasonNum, episodeNum]
+	);
 
-	useEffect(() => {
-		if (!tvId || !s || !e) return;
+	const { data: images } = useTmdbResource<ImagesResponse>(
+		() => getTvEpisodeImages(tvId, seasonNum, episodeNum),
+		[tvId, seasonNum, episodeNum]
+	);
 
-		let cancelled = false;
+	const { data: season } = useTmdbResource<Season>(
+		() => getTvSeason(tvId, seasonNum),
+		[tvId, seasonNum]
+	);
 
-		const load = async () => {
-			setLoading(true);
+	const { data: credits } = useTmdbResource<CreditsResponse>(
+		() => getTvCredits(tvId),
+		[tvId]
+	);
 
-			try {
-				const [epRes, creditsRes, videosRes, imagesRes] = await Promise.all([
-					getTvEpisode(tvId, s, e),
-					getTvCredits(tvId),
-					getTvEpisodeVideos(tvId, s, e),
-					getTvEpisodeImages(tvId, s, e),
-				]);
+	/* ----------------------------------------------------
+	   NEIGHBOR EPISODES
+	---------------------------------------------------- */
+	const { prevEpisode, nextEpisode } = useMemo(() => {
+		if (!season?.episodes) return { prevEpisode: null, nextEpisode: null };
+		const idx = season.episodes.findIndex(
+			(e) => e.episode_number === episodeNum
+		);
+		if (idx === -1) return { prevEpisode: null, nextEpisode: null };
 
-				if (cancelled) return;
+		const prevEpisode = idx > 0 ? season.episodes[idx - 1] : null;
+		const nextEpisode =
+			idx < season.episodes.length - 1 ? season.episodes[idx + 1] : null;
+		return { prevEpisode, nextEpisode };
+	}, [season, episodeNum]);
 
-				setEpisode(epRes);
-				setCredits(creditsRes);
-				setVideos(videosRes);
-				setImages(imagesRes);
-			} catch (err) {
-				if (!cancelled) setError("Failed to load episode.");
-			} finally {
-				if (!cancelled) setLoading(false);
-			}
-		};
+	const preloadPrev = useTmdbPreload(() =>
+		prevEpisode
+			? getTvEpisode(
+					tvId,
+					prevEpisode.season_number,
+					prevEpisode.episode_number
+			  )
+			: Promise.resolve()
+	);
 
-		load();
-		return () => {
-			cancelled = true;
-		};
-	}, [tvId, s, e]);
+	const preloadNext = useTmdbPreload(() =>
+		nextEpisode
+			? getTvEpisode(
+					tvId,
+					nextEpisode.season_number,
+					nextEpisode.episode_number
+			  )
+			: Promise.resolve()
+	);
 
-	/* HERO */
-	const heroSlides: HeroSlide[] = useMemo(() => {
-		if (!episode) return [];
+	/* ----------------------------------------------------
+	   DERIVED DATA
+	---------------------------------------------------- */
+	const mainCast = credits?.cast?.slice(0, 16) ?? [];
 
-		const stills = images?.stills ?? [];
+	const backdropImage =
+		images?.stills?.[0]?.file_path ??
+		images?.backdrops?.[0]?.file_path ??
+		episode?.still_path ??
+		null;
 
-		if (stills.length > 0) {
-			return stills.slice(0, 5).map((img, idx) => ({
-				id: `st-${idx}`,
-				backdropUrl: `https://image.tmdb.org/t/p/original${img.file_path}`,
-				title: episode.name,
-				overview: episode.overview,
-				mediaType: "episode",
-			}));
-		}
+	const backdropUrl = tmdbBackdrop(backdropImage, "lg");
 
-		return [
-			{
-				id: episode.id,
-				backdropUrl: episode.still_path
-					? `https://image.tmdb.org/t/p/original${episode.still_path}`
-					: "/no-image.png",
-				title: episode.name,
-				overview: episode.overview,
-				mediaType: "episode",
-			},
-		];
-	}, [episode, images]);
+	/* ----------------------------------------------------
+	   LOADING / ERROR
+	---------------------------------------------------- */
+	if (
+		!id ||
+		Number.isNaN(tvId) ||
+		Number.isNaN(seasonNum) ||
+		Number.isNaN(episodeNum)
+	) {
+		return (
+			<div className="pt-5 text-center text-muted">Invalid episode URL.</div>
+		);
+	}
 
-	/* CAST */
-	const topCast = credits?.cast.slice(0, 12) ?? [];
-	const guestStars = episode?.guest_stars ?? [];
-
-	if (loading)
+	if (loading && !episode) {
 		return <div className="pt-5 text-center text-muted">Loading episode…</div>;
-	if (error || !episode)
-		return <div className="pt-5 text-center text-red-400">{error}</div>;
+	}
 
+	if (error && !episode) {
+		return (
+			<div className="pt-5 text-center text-red-400">
+				Failed to load episode: {error}
+			</div>
+		);
+	}
+
+	if (!episode) {
+		return (
+			<div className="pt-5 text-center text-muted">
+				Episode not found or unavailable.
+			</div>
+		);
+	}
+
+	/* ----------------------------------------------------
+	   RENDER
+	---------------------------------------------------- */
 	return (
 		<motion.div
 			initial={{ opacity: 0 }}
 			animate={{ opacity: 1 }}
 			className="min-h-screen bg-background pt-5 pb-10"
 		>
-			<ParallaxHero slides={heroSlides}>
-				{() => (
-					<div className="flex flex-col gap-4">
-						<h1 className="text-4xl font-semibold text-foreground">
+			{/* HERO STYLE HEADER */}
+			<div className="relative mx-auto flex max-w-7xl flex-col gap-4 px-4 sm:px-6 lg:px-8">
+				<div className="relative overflow-hidden rounded-xl border border-token bg-black">
+					{backdropUrl && (
+						<img
+							src={backdropUrl}
+							loading="lazy"
+							decoding="async"
+							alt={episode.name}
+							className="h-60 w-full object-cover sm:h-72 md:h-80"
+						/>
+					)}
+					<div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
+					<div className="relative z-10 flex h-full flex-col justify-end p-4 sm:p-6">
+						<p className="text-xs uppercase tracking-[0.2em] text-accent">
+							Season {episode.season_number} · Episode {episode.episode_number}
+						</p>
+						<h1 className="mt-1 text-2xl font-semibold text-foreground sm:text-3xl md:text-4xl">
 							{episode.name}
 						</h1>
-						{episode.overview && (
-							<p className="max-w-3xl text-sm text-muted">{episode.overview}</p>
+						{episode.air_date && (
+							<p className="mt-1 text-xs text-muted">
+								Aired {episode.air_date}
+							</p>
 						)}
 					</div>
-				)}
-			</ParallaxHero>
+				</div>
 
-			<section className="mx-auto mt-8 max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-				{/* Images */}
-				{images && (
+				{/* NAV PREV / NEXT */}
+				<div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+					<div className="flex gap-2">
+						{prevEpisode && (
+							<Link
+								to={`/tv/${tvId}/season/${prevEpisode.season_number}/episode/${prevEpisode.episode_number}`}
+								onMouseEnter={preloadPrev}
+								className="inline-flex items-center rounded-full border border-token bg-surface px-3 py-1 hover:bg-surface-alt"
+							>
+								<span className="mr-1">←</span> Prev: {prevEpisode.name}
+							</Link>
+						)}
+						{nextEpisode && (
+							<Link
+								to={`/tv/${tvId}/season/${nextEpisode.season_number}/episode/${nextEpisode.episode_number}`}
+								onMouseEnter={preloadNext}
+								className="inline-flex items-center rounded-full border border-token bg-surface px-3 py-1 hover:bg-surface-alt"
+							>
+								Next: {nextEpisode.name} <span className="ml-1">→</span>
+							</Link>
+						)}
+					</div>
+				</div>
+			</div>
+
+			<section className="mx-auto mt-6 max-w-7xl px-4 space-y-6">
+				{/* OVERVIEW */}
+				<Surface>
+					<SectionHeader title="Overview" eyebrow="Episode details" />
+					<div className="text-sm text-muted">
+						{episode.overview || "No overview is available for this episode."}
+					</div>
+				</Surface>
+
+				{/* IMAGES */}
+				{(images?.stills?.length ||
+					images?.backdrops?.length ||
+					images?.posters?.length) && (
 					<Surface>
 						<SectionHeader title="Images" eyebrow="Gallery" />
-						<ImageGallery images={images} />
-					</Surface>
-				)}
-
-				{/* Cast */}
-				{topCast.length > 0 && (
-					<Surface>
-						<SectionHeader title="Cast" eyebrow="Main Cast" />
-						<CastCarousel cast={topCast} />
-					</Surface>
-				)}
-
-				{/* Guest Stars */}
-				{guestStars.length > 0 && (
-					<Surface>
-						<SectionHeader
-							title="Guest Stars"
-							eyebrow="Appears In This Episode"
+						<ImageGallery
+							backdrops={images?.backdrops ?? []}
+							posters={images?.posters ?? []}
+							logos={images?.stills ?? []}
 						/>
-						<CastCarousel cast={guestStars} />
 					</Surface>
 				)}
 
-				{/* Videos */}
+				{/* CAST */}
+				{mainCast.length > 0 && (
+					<Surface>
+						<SectionHeader title="Series Cast" eyebrow="Cast" />
+						<CastCarousel cast={mainCast} />
+					</Surface>
+				)}
+
+				{/* VIDEOS */}
 				{videos && videos.results.length > 0 && (
 					<Surface>
 						<SectionHeader title="Videos" eyebrow="Trailers & Clips" />

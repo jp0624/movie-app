@@ -1,17 +1,22 @@
 // src/components/ui/Surface.tsx
 import type { ReactNode } from "react";
 
-interface Props {
+interface SurfaceProps {
 	children: ReactNode;
 	className?: string;
+	as?: keyof JSX.IntrinsicElements;
 }
 
-export default function Surface({ children, className = "" }: Props) {
+export default function Surface({
+	children,
+	className = "",
+	as: Tag = "section",
+}: SurfaceProps) {
 	return (
-		<div
-			className={`rounded-2xl border border-token bg-surface shadow-card p-4 sm:p-6 ${className}`}
+		<Tag
+			className={`bg-surface-alt border border-token rounded-2xl p-4 sm:p-5 shadow-card ${className}`}
 		>
 			{children}
-		</div>
+		</Tag>
 	);
 }

@@ -1,36 +1,30 @@
 // src/components/layout/ThemeToggle.tsx
 import { useTheme } from "../../contexts/ThemeContext";
-import { motion } from "framer-motion";
+
+const LABELS: Record<"light" | "dark" | "cinematic", string> = {
+	light: "Light",
+	dark: "Dark",
+	cinematic: "Cinematic",
+};
+
+const ICONS: Record<"light" | "dark" | "cinematic", string> = {
+	light: "☀",
+	dark: "🌙",
+	cinematic: "🎬",
+};
 
 export default function ThemeToggle() {
 	const { theme, toggleTheme } = useTheme();
 
-	const isDark = theme === "dark";
-
 	return (
 		<button
+			type="button"
 			onClick={toggleTheme}
-			className="relative w-16 h-7 rounded-full bg-surface-alt border border-token flex items-center px-1 shadow-card"
-			aria-label="Toggle theme"
+			className="inline-flex items-center gap-1 rounded-full border border-token bg-surface px-3 py-1 text-xs font-medium text-foreground shadow-sm transition hover:border-accent hover:text-accent"
+			aria-label={`Switch theme (current: ${LABELS[theme]})`}
 		>
-			<motion.div
-				layout
-				transition={{ type: "spring", stiffness: 250, damping: 22 }}
-				className={`h-5 w-5 rounded-full shadow-card ${
-					isDark ? "bg-accent" : "bg-white"
-				}`}
-				style={{
-					x: isDark ? 32 : 0,
-				}}
-			/>
-
-			{/* Icons */}
-			<div className="absolute left-2 text-[10px] text-muted pointer-events-none">
-				🌞
-			</div>
-			<div className="absolute right-2 text-[10px] text-muted pointer-events-none">
-				🌙
-			</div>
+			<span aria-hidden="true">{ICONS[theme]}</span>
+			<span className="hidden sm:inline">{LABELS[theme]}</span>
 		</button>
 	);
 }

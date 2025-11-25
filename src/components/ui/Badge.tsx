@@ -1,15 +1,15 @@
 // src/components/ui/Badge.tsx
-import type { ReactNode } from "react";
+import React from "react";
 
-interface Props {
-	children: ReactNode;
+interface BadgeProps {
+	children: React.ReactNode;
 	className?: string;
 }
 
-export default function Badge({ children, className = "" }: Props) {
+export default function Badge({ children, className = "" }: BadgeProps) {
 	return (
 		<span
-			className={`inline-flex items-center rounded-full border border-token bg-surface-alt px-2 py-0.5 text-xs text-muted ${className}`}
+			className={`inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-foreground ${className}`}
 		>
 			{children}
 		</span>

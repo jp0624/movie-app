@@ -1,12 +1,18 @@
+// src/main.tsx
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import Providers from "./contexts/Providers";
+
 import "./styles/main.css";
 
-const saved = localStorage.getItem("theme") || "dark";
-if (saved === "dark") {
-	document.documentElement.classList.add("dark");
-} else {
-	document.documentElement.classList.remove("dark");
-}
+const rootEl = document.getElementById("root");
+if (!rootEl) throw new Error("Root element #root not found");
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(rootEl).render(
+	<BrowserRouter>
+		<Providers>
+			<App />
+		</Providers>
+	</BrowserRouter>
+);

@@ -1,6 +1,6 @@
 // src/pages/tv/SeasonDetails.tsx
-import { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 
 import type { Season, Episode } from "../../types/Tv";
@@ -13,117 +13,141 @@ import {
 	getTvSeasonImages,
 } from "../../services/api";
 
+import { useTmdbResource } from "../../hooks/useTmdbResource";
+import { tmdbBackdrop, tmdbPoster } from "../../utils/tmdbImage";
+
 import Surface from "../../components/ui/Surface";
 import SectionHeader from "../../components/ui/SectionHeader";
 import CastCarousel from "../../components/media/CastCarousel";
-import EpisodeCard from "../../components/media/EpisodeCard";
-import ImageGallery from "../../components/media/ImageGallery";
-
+import EpisodeCard from "../../components/media/cards/EpisodeCard";
+import ImageGallery from "../../components/media/info/ImageGallery";
 import ParallaxHero, {
 	type HeroSlide,
-} from "../../components/layout/ParallaxHero";
+} from "../../components/layout/Hero/ParallaxHero";
+
+const EPISODES_PAGE_SIZE = 20;
 
 export default function SeasonDetails() {
 	const { id, seasonNumber } = useParams();
 	const tvId = Number(id);
 	const seasonNum = Number(seasonNumber);
 
-	const [season, setSeason] = useState<Season | null>(null);
-	const [show, setShow] = useState<any | null>(null);
-	const [credits, setCredits] = useState<CreditsResponse | null>(null);
-	const [images, setImages] = useState<ImagesResponse | null>(null);
+	/* ----------------------------------------------------
+	   FETCH — Cached TMDB Requests
+	---------------------------------------------------- */
+	const {
+		data: show,
+		loading: showLoading,
+		error: showError,
+	} = useTmdbResource(() => getTv(tvId), [tvId]);
 
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const {
+		data: season,
+		loading: seasonLoading,
+		error: seasonError,
+	} = useTmdbResource<Season>(
+		() => getTvSeason(tvId, seasonNum),
+		[tvId, seasonNum]
+	);
 
-	useEffect(() => {
-		if (!tvId || !seasonNum) return;
-		let cancelled = false;
+	const { data: credits } = useTmdbResource<CreditsResponse>(
+		() => getTvCredits(tvId),
+		[tvId]
+	);
 
-		const load = async () => {
-			setLoading(true);
+	const { data: images } = useTmdbResource<ImagesResponse>(
+		() => getTvSeasonImages(tvId, seasonNum),
+		[tvId, seasonNum]
+	);
 
-			try {
-				const [showRes, seasonRes, creditsRes, imagesRes] = await Promise.all([
-					getTv(tvId),
-					getTvSeason(tvId, seasonNum),
-					getTvCredits(tvId),
-					getTvSeasonImages(tvId, seasonNum),
-				]);
-
-				if (cancelled) return;
-
-				setShow(showRes);
-				setSeason(seasonRes);
-				setCredits(creditsRes);
-				setImages(imagesRes);
-			} catch (err) {
-				if (!cancelled) {
-					setError("Failed to load season details.");
-				}
-			} finally {
-				if (!cancelled) setLoading(false);
-			}
-		};
-
-		load();
-		return () => {
-			cancelled = true;
-		};
-	}, [tvId, seasonNum]);
-
-	/* -----------------------------
+	/* ----------------------------------------------------
 	   HERO SLIDES
-	----------------------------- */
+	---------------------------------------------------- */
 	const heroSlides: HeroSlide[] = useMemo(() => {
-		if (!season) return [];
+		if (!show || !season) return [];
 
-		const stills = images?.posters ?? [];
+		const backdrops = images?.backdrops ?? [];
 
-		if (stills.length > 0) {
-			return stills.slice(0, 5).map((s, idx) => ({
-				id: `st-${idx}`,
-				backdropUrl: `https://image.tmdb.org/t/p/original${s.file_path}`,
-				title: season.name,
-				overview: season.overview,
-				mediaType: "season",
+		if (backdrops.length > 0) {
+			return backdrops.slice(0, 5).map((b, idx) => ({
+				id: `season-bd-${idx}`,
+				backdropUrl: tmdbBackdrop(b.file_path, "lg"),
+				title: `${show.name} — ${season.name}`,
+				overview: season.overview || show.overview,
+				year: season.air_date?.split("-")[0] ?? "",
+				score: show.vote_average ?? null,
+				mediaType: "tv",
 			}));
 		}
 
-		// fallback
 		return [
 			{
-				id: season.id,
-				backdropUrl: season.poster_path
-					? `https://image.tmdb.org/t/p/original${season.poster_path}`
-					: "/no-image.png",
-				title: season.name,
-				overview: season.overview,
-				mediaType: "season",
+				id: `${show.id}-season-${season.season_number}`,
+				backdropUrl: tmdbBackdrop(
+					season.poster_path || show.backdrop_path || show.poster_path,
+					"lg"
+				),
+				title: `${show.name} — ${season.name}`,
+				overview: season.overview || show.overview,
+				year: season.air_date?.split("-")[0] ?? "",
+				score: show.vote_average ?? null,
+				mediaType: "tv",
 			},
 		];
-	}, [season, images]);
+	}, [show, season, images]);
 
-	/* -----------------------------
-	   CAST + GUEST STARS
-	----------------------------- */
+	/* ----------------------------------------------------
+	   EPISODES — progressive loading
+	---------------------------------------------------- */
+	const episodes: Episode[] = season?.episodes ?? [];
+	const [visibleCount, setVisibleCount] = useState(EPISODES_PAGE_SIZE);
 
-	const topCast = credits?.cast.slice(0, 12) ?? [];
+	const visibleEpisodes = useMemo(
+		() => episodes.slice(0, visibleCount),
+		[episodes, visibleCount]
+	);
 
-	const guestStars = useMemo(() => {
-		if (!season?.episodes) return [];
-		return season.episodes.flatMap((ep) => ep.guest_stars ?? []);
-	}, [season]);
+	const canShowMore = visibleCount < episodes.length;
 
-	/* -----------------------------
-	   RENDERING
-	----------------------------- */
+	/* ----------------------------------------------------
+	   CAST
+	---------------------------------------------------- */
+	const mainCast = credits?.cast?.slice(0, 16) ?? [];
 
-	if (loading)
-		return <div className="pt-5 text-center text-muted">Loading season…</div>;
-	if (error || !season || !show)
-		return <div className="pt-5 text-center text-red-400">{error}</div>;
+	/* ----------------------------------------------------
+	   LOADING & ERROR STATES
+	---------------------------------------------------- */
+	if (!id || Number.isNaN(tvId) || Number.isNaN(seasonNum)) {
+		return (
+			<div className="pt-5 text-center text-muted">Invalid season URL.</div>
+		);
+	}
 
+	if ((showLoading || seasonLoading) && !show && !season) {
+		return (
+			<div className="pt-5 text-center text-muted">Loading season details…</div>
+		);
+	}
+
+	if ((showError || seasonError) && (!show || !season)) {
+		return (
+			<div className="pt-5 text-center text-red-400">
+				Failed to load season: {showError || seasonError}
+			</div>
+		);
+	}
+
+	if (!show || !season) {
+		return (
+			<div className="pt-5 text-center text-muted">
+				Season not found or unavailable.
+			</div>
+		);
+	}
+
+	/* ----------------------------------------------------
+	   RENDER
+	---------------------------------------------------- */
 	return (
 		<motion.div
 			initial={{ opacity: 0 }}
@@ -131,59 +155,124 @@ export default function SeasonDetails() {
 			className="min-h-screen bg-background pt-5 pb-10"
 		>
 			{/* HERO */}
-			<ParallaxHero slides={heroSlides}>
-				{() => (
-					<div className="flex flex-col gap-4">
-						<h1 className="text-4xl font-semibold text-foreground">
-							{show.name} — {season.name}
-						</h1>
+			{heroSlides.length > 0 && (
+				<ParallaxHero slides={heroSlides}>
+					{() => (
+						<div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
+							{/* Season poster */}
+							<div className="hidden w-40 md:w-52 overflow-hidden rounded-xl border border-token sm:block">
+								<img
+									src={tmdbPoster(season.poster_path ?? show.poster_path, "md")}
+									loading="lazy"
+									decoding="async"
+									alt={season.name}
+									className="h-full w-full object-cover"
+								/>
+							</div>
 
-						{season.overview && (
-							<p className="max-w-3xl text-sm text-muted">{season.overview}</p>
-						)}
-					</div>
-				)}
-			</ParallaxHero>
+							<div className="flex flex-col gap-3">
+								<h1 className="text-3xl font-semibold text-foreground sm:text-4xl">
+									{show.name}{" "}
+									<span className="text-muted text-2xl">— {season.name}</span>
+								</h1>
+								{season.air_date && (
+									<p className="text-sm text-muted">
+										Premiered: {season.air_date}
+									</p>
+								)}
+								{season.overview && (
+									<p className="max-w-3xl text-sm text-muted">
+										{season.overview}
+									</p>
+								)}
+							</div>
+						</div>
+					)}
+				</ParallaxHero>
+			)}
 
-			<section className="mx-auto mt-8 max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-				{/* Images */}
-				{images && (
+			<section className="mx-auto mt-8 max-w-7xl px-4 space-y-6">
+				{/* DETAILS + IMAGES */}
+				<div className="grid gap-6 lg:grid-cols-2">
 					<Surface>
-						<SectionHeader title="Images" eyebrow="Gallery" />
-						<ImageGallery images={images} />
+						<SectionHeader title="Season Details" eyebrow="Overview" />
+						<div className="grid gap-3 text-sm text-muted sm:grid-cols-2">
+							{season.air_date && (
+								<div>
+									<span className="font-medium text-foreground">Air Date:</span>{" "}
+									{season.air_date}
+								</div>
+							)}
+							{season.episode_count != null && (
+								<div>
+									<span className="font-medium text-foreground">Episodes:</span>{" "}
+									{season.episode_count}
+								</div>
+							)}
+							{show.number_of_seasons != null && (
+								<div>
+									<span className="font-medium text-foreground">
+										Total Seasons:
+									</span>{" "}
+									{show.number_of_seasons}
+								</div>
+							)}
+						</div>
 					</Surface>
-				)}
 
-				{/* Cast */}
-				{topCast.length > 0 && (
-					<Surface>
-						<SectionHeader title="Season Cast" eyebrow="Cast" />
-						<CastCarousel cast={topCast} />
-					</Surface>
-				)}
+					{(images?.backdrops?.length ||
+						images?.posters?.length ||
+						images?.stills?.length) && (
+						<Surface>
+							<SectionHeader title="Season Images" eyebrow="Gallery" />
+							<ImageGallery
+								backdrops={images?.backdrops ?? []}
+								posters={images?.posters ?? []}
+								logos={images?.stills ?? []}
+							/>
+						</Surface>
+					)}
+				</div>
 
-				{/* Guest Stars */}
-				{guestStars.length > 0 && (
+				{/* EPISODES */}
+				{episodes.length > 0 && (
 					<Surface>
-						<SectionHeader title="Guest Stars" eyebrow="Episodes" />
-						<CastCarousel cast={guestStars} />
-					</Surface>
-				)}
-
-				{/* Episodes */}
-				{season.episodes && season.episodes.length > 0 && (
-					<Surface>
-						<SectionHeader title="Episodes" eyebrow={`Season ${seasonNum}`} />
-						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-							{season.episodes.map((ep) => (
-								<Link
+						<SectionHeader title="Episodes" eyebrow="Season episodes" />
+						<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+							{visibleEpisodes.map((ep) => (
+								<EpisodeCard
 									key={ep.id}
-									to={`/tv/${tvId}/season/${seasonNum}/episode/${ep.episode_number}`}
-								>
-									<EpisodeCard episode={ep} />
-								</Link>
+									showId={tvId}
+									seasonNumber={seasonNum}
+									episode={ep}
+								/>
 							))}
 						</div>
+
+						{canShowMore && (
+							<div className="mt-4 text-center">
+								<button
+									type="button"
+									onClick={() =>
+										setVisibleCount((prev) =>
+											Math.min(prev + EPISODES_PAGE_SIZE, episodes.length)
+										)
+									}
+									className="inline-flex items-center rounded-full border border-token bg-surface px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-alt"
+								>
+									Show more episodes ({episodes.length - visibleCount}{" "}
+									remaining)
+								</button>
+							</div>
+						)}
+					</Surface>
+				)}
+
+				{/* CAST */}
+				{mainCast.length > 0 && (
+					<Surface>
+						<SectionHeader title="Series Cast" eyebrow="Main cast" />
+						<CastCarousel cast={mainCast} />
 					</Surface>
 				)}
 			</section>

@@ -1,92 +1,66 @@
 // src/pages/search/SearchPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
 import useDebounce from "../../hooks/useDebounce";
 import { searchMulti } from "../../services/api";
+import { useAISuggestions } from "../../hooks/useAISuggestions";
+import { useTmdbPreload } from "../../hooks/useTmdbPreload";
 
-type MediaTypeFilter = "all" | "movie" | "tv" | "person";
-type OrderBy = "default" | "popular" | "top_rated" | "trending" | "now_playing";
+import Surface from "../../components/ui/Surface";
+import SectionHeader from "../../components/ui/SectionHeader";
+import MovieCard from "../../components/media/cards/MovieCard";
 
-interface MultiResultBase {
+type MediaType = "movie" | "tv" | "person";
+
+interface MultiResult {
 	id: number;
-	media_type: "movie" | "tv" | "person";
+	media_type: MediaType;
+	title?: string;
+	name?: string;
+	overview?: string;
 	popularity?: number;
 	vote_average?: number;
-	vote_count?: number;
-	poster_path?: string | null;
-	profile_path?: string | null;
-	backdrop_path?: string | null;
-	overview?: string;
-	name?: string;
-	title?: string;
-	release_date?: string;
 	first_air_date?: string;
+	release_date?: string;
+	known_for_department?: string;
 }
 
-type MultiResult = MultiResultBase;
-
-const typeLabel: Record<MediaTypeFilter, string> = {
-	all: "All",
-	movie: "Movies",
-	tv: "TV Shows",
-	person: "People",
-};
-
-const orderLabel: Record<OrderBy, string> = {
-	default: "All",
-	popular: "Popular",
-	top_rated: "Top Rated",
-	trending: "Trending",
-	now_playing: "Now Playing",
-};
-
-const statusOptions = [
-	"",
-	"Rumored",
-	"Planned",
-	"In Production",
-	"Post Production",
-	"Released",
-	"Canceled",
-	"Returning Series",
-	"Ended",
-];
-
-const streamingOptions = [
-	"",
-	"Netflix",
-	"Disney+",
-	"Prime Video",
-	"HBO Max",
-	"Hulu",
-	"Apple TV+",
-	"Paramount+",
-	"Crave",
-];
-
 export default function SearchPage() {
-	const [query, setQuery] = useState("");
-	const debounced = useDebounce(query, 400);
+	const [searchParams] = useSearchParams();
+	const navigate = useNavigate();
 
-	const [typeFilter, setTypeFilter] = useState<MediaTypeFilter>("all");
-	const [yearFrom, setYearFrom] = useState<string>("");
-	const [yearTo, setYearTo] = useState<string>("");
-	const [status, setStatus] = useState<string>("");
-	const [streaming, setStreaming] = useState<string>("");
-
-	const [minRating, setMinRating] = useState<number>(0);
-	const [orderBy, setOrderBy] = useState<OrderBy>("default");
+	const initialQuery = searchParams.get("q") ?? "";
+	const [query, setQuery] = useState(initialQuery);
+	const debounced = useDebounce(query, 350);
 
 	const [results, setResults] = useState<MultiResult[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
+	const suggestions = useAISuggestions(query);
+	const preload = useTmdbPreload((item: MultiResult) => {
+		if (!item) return;
+		return import("../../services/api").then((m) => {
+			if (item.media_type === "movie") return m.getMovie(item.id);
+			if (item.media_type === "tv") return m.getTv(item.id);
+			return m.getPerson(item.id);
+		});
+	});
+
+	// Keep URL in sync with query
+	useEffect(() => {
+		const params = new URLSearchParams();
+		if (query.trim()) params.set("q", query.trim());
+		navigate({ search: params.toString() }, { replace: true });
+	}, [query, navigate]);
+
+	// Load results from TMDB
 	useEffect(() => {
 		let cancelled = false;
 
-		const load = async () => {
+		async function runSearch() {
 			if (!debounced.trim()) {
 				setResults([]);
 				setError(null);
@@ -97,111 +71,78 @@ export default function SearchPage() {
 			setError(null);
 
 			try {
-				const res = await searchMulti(debounced, 1);
+				const data = await searchMulti(debounced.trim(), 1);
 				if (cancelled) return;
-
-				setResults(res.results ?? []);
-			} catch (err) {
+				setResults((data.results ?? []) as MultiResult[]);
+			} catch (err: any) {
 				if (!cancelled) {
-					setError(
-						err instanceof Error
-							? err.message
-							: "Failed to search, please retry."
-					);
+					setError(err?.message || "Failed to search.");
+					setResults([]);
 				}
 			} finally {
 				if (!cancelled) setLoading(false);
 			}
-		};
+		}
 
-		void load();
+		void runSearch();
 		return () => {
 			cancelled = true;
 		};
 	}, [debounced]);
 
-	const filteredSorted = useMemo(() => {
-		let items = [...results];
+	// Simple scoring / fuzzy-ish relevance boost
+	const scored = useMemo(() => {
+		const q = debounced.trim().toLowerCase();
+		if (!q) return results;
 
-		if (typeFilter !== "all") {
-			items = items.filter((r) => r.media_type === typeFilter);
-		}
+		const scoreItem = (item: MultiResult) => {
+			const title = (item.title || item.name || "").toLowerCase();
+			let score = 0;
 
-		if (yearFrom) {
-			const yf = Number(yearFrom);
-			if (!Number.isNaN(yf)) {
-				items = items.filter((r) => {
-					const d = r.release_date || r.first_air_date || "";
-					const y = d ? Number(String(d).split("-")[0]) : NaN;
-					return !Number.isNaN(y) && y >= yf;
-				});
-			}
-		}
+			if (title.includes(q)) score += 3;
+			if (title.startsWith(q)) score += 2;
 
-		if (yearTo) {
-			const yt = Number(yearTo);
-			if (!Number.isNaN(yt)) {
-				items = items.filter((r) => {
-					const d = r.release_date || r.first_air_date || "";
-					const y = d ? Number(String(d).split("-")[0]) : NaN;
-					return !Number.isNaN(y) && y <= yt;
-				});
-			}
-		}
+			// word overlap
+			const qWords = q.split(/\s+/);
+			const tWords = title.split(/\s+/);
+			const overlap = qWords.filter((w) => tWords.includes(w)).length;
+			score += overlap;
 
-		if (minRating > 0) {
-			items = items.filter((r) => (r.vote_average ?? 0) >= minRating);
-		}
+			if (item.popularity) score += item.popularity / 100;
+			if (item.vote_average) score += item.vote_average / 2;
 
-		if (status) {
-			items = items.filter((r) => {
-				const anyR = r as any;
-				return anyR.status ? anyR.status === status : true;
-			});
-		}
+			return score;
+		};
 
-		if (streaming) {
-			items = items.filter((r) => {
-				const anyR = r as any;
-				const providers: string[] = anyR.streamingProviders ?? [];
-				if (!providers || providers.length === 0) return true;
-				return providers.includes(streaming);
-			});
-		}
+		return [...results].sort((a, b) => scoreItem(b) - scoreItem(a));
+	}, [results, debounced]);
 
-		switch (orderBy) {
-			case "popular":
-				items.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
-				break;
-			case "top_rated":
-				items.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0));
-				break;
-			case "trending":
-				items.sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
-				break;
-			case "now_playing":
-				items.sort((a, b) => {
-					const da = a.release_date || a.first_air_date || "";
-					const db = b.release_date || b.first_air_date || "";
-					return db.localeCompare(da);
-				});
-				break;
-			case "default":
-			default:
-				break;
-		}
+	const movies = scored.filter((r) => r.media_type === "movie");
+	const tv = scored.filter((r) => r.media_type === "tv");
+	const people = scored.filter((r) => r.media_type === "person");
 
-		return items;
-	}, [
-		results,
-		typeFilter,
-		yearFrom,
-		yearTo,
-		minRating,
-		status,
-		streaming,
-		orderBy,
-	]);
+	const topResult = scored[0] ?? null;
+
+	/* --------------------------------------------------
+	   RECENT SEARCHES
+	-------------------------------------------------- */
+	const [recent, setRecent] = useState<string[]>(() => {
+		const saved = localStorage.getItem("recentSearches");
+		return saved ? JSON.parse(saved) : [];
+	});
+
+	const addRecent = (term: string) => {
+		const t = term.trim();
+		if (!t) return;
+		const next = [t, ...recent.filter((r) => r !== t)].slice(0, 10);
+		setRecent(next);
+		localStorage.setItem("recentSearches", JSON.stringify(next));
+	};
+
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		addRecent(query);
+	};
 
 	return (
 		<motion.div
@@ -210,252 +151,167 @@ export default function SearchPage() {
 			className="min-h-screen bg-background pt-20 pb-10"
 		>
 			<section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-				<header className="mb-6 sm:mb-8">
-					<h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
-						Search
-					</h1>
-					<p className="mt-1 text-sm text-muted">
-						Find movies, TV shows, and people across CineScope.
-					</p>
-				</header>
+				<h1 className="text-3xl font-semibold text-foreground mb-4">Search</h1>
 
-				{/* FILTERS */}
-				<div className="mb-6 space-y-4 rounded-xl border border-token bg-surface p-4 shadow-card sm:p-5">
-					{/* Row 1: Search + type pills */}
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-						<div className="flex-1">
-							<input
-								className="w-full rounded-lg border border-token bg-surface-alt px-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
-								placeholder="Search for a movie, TV show, or person…"
-								value={query}
-								onChange={(e) => setQuery(e.target.value)}
-							/>
-						</div>
+				<form onSubmit={handleSubmit} className="relative max-w-2xl mb-4">
+					<input
+						value={query}
+						onChange={(e) => setQuery(e.target.value)}
+						placeholder="Search movies, TV shows, and people…"
+						className="w-full rounded-lg border border-token bg-surface px-4 py-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+					/>
+					{query && (
+						<button
+							type="button"
+							onClick={() => setQuery("")}
+							className="absolute right-3 top-1/2 -translate-y-1/2 text-lg text-muted hover:text-foreground"
+						>
+							×
+						</button>
+					)}
+				</form>
 
-						<div className="flex flex-wrap items-center gap-2 text-xs">
-							{(["all", "movie", "tv", "person"] as MediaTypeFilter[]).map(
-								(t) => (
+				{/* Recent + AI Suggestions */}
+				<div className="grid gap-4 md:grid-cols-2 mb-6">
+					{recent.length > 0 && (
+						<Surface>
+							<SectionHeader title="Recent searches" />
+							<div className="flex flex-wrap gap-2">
+								{recent.map((r) => (
 									<button
-										key={t}
+										key={r}
 										type="button"
-										onClick={() => setTypeFilter(t)}
-										className={`rounded-full border px-3 py-1 transition-colors ${
-											typeFilter === t
-												? "border-accent bg-accent text-white shadow-card"
-												: "border-token bg-surface-alt text-muted hover:text-foreground"
-										}`}
+										onClick={() => setQuery(r)}
+										className="rounded-full border border-token px-3 py-1 text-xs text-muted hover:text-foreground hover:bg-surface-alt"
 									>
-										{typeLabel[t]}
-									</button>
-								)
-							)}
-						</div>
-					</div>
-
-					{/* Row 2: Year From, Status, Min Rating slider */}
-					<div className="grid gap-4 md:grid-cols-[1fr_1fr_2fr]">
-						{/* Year From */}
-						<div className="space-y-1">
-							<label className="block text-xs font-medium uppercase tracking-wide text-muted">
-								Year (From)
-							</label>
-							<input
-								type="number"
-								min={1900}
-								max={2100}
-								value={yearFrom}
-								onChange={(e) => setYearFrom(e.target.value)}
-								className="w-full rounded-lg border border-token bg-surface-alt px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
-								placeholder="e.g. 2000"
-							/>
-						</div>
-
-						{/* Status dropdown */}
-						<div className="space-y-1">
-							<label className="block text-xs font-medium uppercase tracking-wide text-muted">
-								Status
-							</label>
-							<select
-								value={status}
-								onChange={(e) => setStatus(e.target.value)}
-								className="w-full rounded-lg border border-token bg-surface-alt px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-							>
-								<option value="">Any</option>
-								{statusOptions.map((opt) =>
-									opt ? (
-										<option key={opt} value={opt}>
-											{opt}
-										</option>
-									) : null
-								)}
-							</select>
-						</div>
-
-						{/* Min Rating slider */}
-						<div className="space-y-1">
-							<label className="block text-xs font-medium uppercase tracking-wide text-muted">
-								Min Rating ({minRating.toFixed(1)})
-							</label>
-							<input
-								type="range"
-								min={0}
-								max={10}
-								step={0.5}
-								value={minRating}
-								onChange={(e) => setMinRating(Number(e.target.value))}
-								className="w-full accent-accent"
-							/>
-						</div>
-					</div>
-
-					{/* Row 3: Year To, Streaming, Order By */}
-					<div className="grid gap-4 md:grid-cols-[1fr_1fr_2fr]">
-						{/* Year To */}
-						<div className="space-y-1">
-							<label className="block text-xs font-medium uppercase tracking-wide text-muted">
-								Year (To)
-							</label>
-							<input
-								type="number"
-								min={1900}
-								max={2100}
-								value={yearTo}
-								onChange={(e) => setYearTo(e.target.value)}
-								className="w-full rounded-lg border border-token bg-surface-alt px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
-								placeholder="e.g. 2024"
-							/>
-						</div>
-
-						{/* Streaming */}
-						<div className="space-y-1">
-							<label className="block text-xs font-medium uppercase tracking-wide text-muted">
-								Available On (Streaming)
-							</label>
-							<select
-								value={streaming}
-								onChange={(e) => setStreaming(e.target.value)}
-								className="w-full rounded-lg border border-token bg-surface-alt px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-							>
-								<option value="">Any</option>
-								{streamingOptions.map((opt) =>
-									opt ? (
-										<option key={opt} value={opt}>
-											{opt}
-										</option>
-									) : null
-								)}
-							</select>
-						</div>
-
-						{/* Order By pills */}
-						<div className="space-y-1">
-							<label className="block text-xs font-medium uppercase tracking-wide text-muted">
-								Order By
-							</label>
-							<div className="flex flex-wrap gap-2 text-xs">
-								{(
-									[
-										"default",
-										"popular",
-										"top_rated",
-										"trending",
-										"now_playing",
-									] as OrderBy[]
-								).map((o) => (
-									<button
-										key={o}
-										type="button"
-										onClick={() => setOrderBy(o)}
-										className={`rounded-full border px-3 py-1 transition-colors ${
-											orderBy === o
-												? "border-accent bg-accent text-white shadow-card"
-												: "border-token bg-surface-alt text-muted hover:text-foreground"
-										}`}
-									>
-										{orderLabel[o]}
+										{r}
 									</button>
 								))}
 							</div>
-						</div>
-					</div>
+						</Surface>
+					)}
+
+					{suggestions.length > 0 && (
+						<Surface>
+							<SectionHeader title="Suggestions" eyebrow="AI-style ideas" />
+							<div className="flex flex-col gap-2 text-sm">
+								{suggestions.map((s) => (
+									<button
+										key={s.id}
+										type="button"
+										onClick={() => setQuery(s.query)}
+										className="text-left text-accent hover:text-accent-soft"
+									>
+										{s.label}
+									</button>
+								))}
+							</div>
+						</Surface>
+					)}
 				</div>
 
-				{/* RESULTS */}
-				<section>
-					{loading && (
-						<p className="text-sm text-muted">
-							Searching TMDB for “{debounced}”…
-						</p>
-					)}
-					{error && !loading && (
-						<p className="text-sm text-red-400">Error: {error}</p>
-					)}
-					{!loading && !error && debounced && filteredSorted.length === 0 && (
-						<p className="text-sm text-muted">No results found.</p>
-					)}
+				{/* Status */}
+				{loading && <p className="text-sm text-muted mb-4">Searching TMDB…</p>}
+				{error && <p className="text-sm text-red-400 mb-4">{error}</p>}
+				{!loading && !error && debounced && scored.length === 0 && (
+					<p className="text-sm text-muted mb-4">
+						No results found for “{debounced}”.
+					</p>
+				)}
 
-					<div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-						{filteredSorted.map((item) => {
-							const isPerson = item.media_type === "person";
-							const isTv = item.media_type === "tv";
-							const title = isPerson
-								? item.name
-								: item.title || item.name || "Untitled";
-							const date = item.release_date || item.first_air_date || "";
-							const year = date ? date.split("-")[0] : "";
-							const rating =
-								!isPerson && item.vote_average != null
-									? item.vote_average.toFixed(1)
-									: null;
-							const imgPath = isPerson
-								? item.profile_path
-								: item.poster_path || item.backdrop_path;
-							const href = isPerson
-								? `/person/${item.id}`
-								: isTv
-								? `/tv/${item.id}`
-								: `/movie/${item.id}`;
+				{/* TOP RESULT */}
+				{topResult && (
+					<Surface className="mb-8">
+						<SectionHeader title="Top result" eyebrow="Best match" />
+						<Link
+							to={
+								topResult.media_type === "movie"
+									? `/movie/${topResult.id}`
+									: topResult.media_type === "tv"
+									? `/tv/${topResult.id}`
+									: `/person/${topResult.id}`
+							}
+							onMouseEnter={() => preload(topResult)}
+							className="block rounded-lg border border-token bg-surface-alt p-4 hover:bg-surface transition"
+						>
+							<h2 className="text-lg font-semibold text-foreground">
+								{topResult.title || topResult.name}
+							</h2>
+							<p className="text-xs text-muted mt-1 uppercase tracking-[0.2em]">
+								{topResult.media_type}
+							</p>
+							{topResult.overview && (
+								<p className="mt-2 text-sm text-muted line-clamp-3">
+									{topResult.overview}
+								</p>
+							)}
+						</Link>
+					</Surface>
+				)}
 
-							return (
+				{/* MOVIES */}
+				{movies.length > 0 && (
+					<Surface className="mb-8">
+						<SectionHeader title="Movies" />
+						<div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+							{movies.map((m) => (
+								<MovieCard key={m.id} movie={m as any} mediaType="movie" />
+							))}
+						</div>
+					</Surface>
+				)}
+
+				{/* TV SHOWS */}
+				{tv.length > 0 && (
+					<Surface className="mb-8">
+						<SectionHeader title="TV Shows" />
+						<div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+							{tv.map((t) => (
 								<Link
-									key={`${item.media_type}-${item.id}`}
-									to={href}
-									className="group overflow-hidden rounded-xl border border-token bg-surface shadow-card transition-transform hover:-translate-y-0.5"
+									key={t.id}
+									to={`/tv/${t.id}`}
+									onMouseEnter={() => preload(t)}
+									className="rounded-xl border border-token bg-surface p-3 hover:bg-surface-alt transition"
 								>
-									<div className="relative aspect-[2/3] overflow-hidden">
-										<img
-											src={
-												imgPath
-													? `https://image.tmdb.org/t/p/w500${imgPath}`
-													: "/no-image.png"
-											}
-											alt={title}
-											className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-										/>
-										<div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-									</div>
-									<div className="space-y-1.5 p-3 text-sm">
-										<p className="line-clamp-2 font-medium text-foreground">
-											{title}
-										</p>
-										<div className="flex items-center justify-between text-xs text-muted">
-											<span className="uppercase tracking-wide">
-												{item.media_type}
-											</span>
-											{year && <span>{year}</span>}
-										</div>
-										{rating && (
-											<div className="flex items-center gap-1 text-xs text-muted">
-												<span className="text-yellow-400 text-sm">★</span>
-												{rating}
-											</div>
-										)}
-									</div>
+									<p className="font-semibold text-sm text-foreground line-clamp-2">
+										{t.name || t.title}
+									</p>
+									<p className="text-xs text-muted mt-1">
+										{t.first_air_date?.split("-")[0] ??
+											t.release_date?.split("-")[0] ??
+											"—"}
+									</p>
 								</Link>
-							);
-						})}
-					</div>
-				</section>
+							))}
+						</div>
+					</Surface>
+				)}
+
+				{/* PEOPLE */}
+				{people.length > 0 && (
+					<Surface className="mb-8">
+						<SectionHeader title="People" />
+						<div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+							{people.map((p) => (
+								<Link
+									key={p.id}
+									to={`/person/${p.id}`}
+									onMouseEnter={() => preload(p)}
+									className="rounded-xl border border-token bg-surface p-3 hover:bg-surface-alt transition"
+								>
+									<p className="font-semibold text-sm text-foreground line-clamp-2">
+										{p.name}
+									</p>
+									{p.known_for_department && (
+										<p className="text-xs text-muted mt-1">
+											Known for: {p.known_for_department}
+										</p>
+									)}
+								</Link>
+							))}
+						</div>
+					</Surface>
+				)}
 			</section>
 		</motion.div>
 	);

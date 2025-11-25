@@ -1,19 +1,20 @@
 // src/components/ui/IconButton.tsx
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import React from "react";
 
-interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-	children: ReactNode;
+interface IconButtonProps
+	extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+	children: React.ReactNode;
 }
 
 export default function IconButton({
 	children,
 	className = "",
-	...rest
-}: Props) {
+	...props
+}: IconButtonProps) {
 	return (
 		<button
-			className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-token bg-surface-alt text-muted hover:text-foreground hover:bg-surface shadow-card transition-colors ${className}`}
-			{...rest}
+			{...props}
+			className={`flex h-8 w-8 items-center justify-center rounded-md border border-token bg-surface-alt text-foreground hover:bg-surface transition ${className}`}
 		>
 			{children}
 		</button>
